@@ -1,0 +1,292 @@
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+
+  font-family: Arial, Helvetica, sans-serif;
+
+  background: #f3efe3;
+}
+
+.container {
+  height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.header h1 {
+  margin: 0;
+
+  font-size: 42px;
+
+  letter-spacing: 3px;
+
+  text-transform: uppercase;
+
+  color: #3f2f1d;
+}
+
+.header p {
+  margin-top: 8px;
+
+  font-size: 18px;
+
+  color: #b8860b;
+}
+
+.content {
+  display: flex;
+
+  justify-content: center;
+
+  gap: 30px;
+
+  height: calc(100vh - 260px);
+}
+
+.map-area {
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+}
+
+.map-wrapper {
+  position: relative;
+
+  max-width: 100%;
+  max-height: 100%;
+
+  border: 4px solid #d4af37;
+
+  border-radius: 24px;
+
+  overflow: hidden;
+
+  background: white;
+
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.15),
+    inset 0 0 30px rgba(0, 0, 0, 0.05);
+}
+
+.map {
+  display: block;
+
+  max-width: 100%;
+  max-height: 520px;
+
+  width: auto;
+  height: auto;
+}
+
+.events-panel {
+  width: 520px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 15px;
+}
+
+.event-card {
+  background: #faf8f2;
+
+  border-left: 6px solid #b8860b;
+
+  border-radius: 16px;
+
+  padding: 18px;
+
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+
+  box-shadow:
+    0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.event-card:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.active-card {
+  border-left: 8px solid #2563eb;
+
+  background: #f8fbff;
+
+  transform: scale(1.03);
+
+  box-shadow:
+    0 8px 25px rgba(37, 99, 235, 0.25);
+}
+
+.event-card h3 {
+  margin: 0;
+
+  color: #1e293b;
+}
+
+.card-date {
+  display: block;
+
+  margin-top: 8px;
+
+  color: #2563eb;
+
+  font-weight: bold;
+}
+
+.event-card p {
+  margin-top: 10px;
+
+  font-size: 14px;
+
+  line-height: 1.5;
+
+  color: #475569;
+}
+
+.marker {
+  position: absolute;
+
+  width: 18px;
+  height: 18px;
+
+  background: #8b0000;
+
+  border-radius: 50%;
+
+  border: 4px solid white;
+
+  transform: translate(-50%, -50%);
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.marker:hover {
+  transform:
+    translate(-50%, -50%)
+    scale(1.3);
+}
+
+.marker.active {
+  background: #2563eb;
+
+  width: 24px;
+  height: 24px;
+}
+
+.marker-tooltip {
+  display: none;
+
+  position: absolute;
+
+  left: 24px;
+  top: -10px;
+
+  background: #111827;
+
+  color: white;
+
+  padding: 8px 12px;
+
+  border-radius: 8px;
+
+  white-space: nowrap;
+
+  z-index: 999;
+}
+
+.marker:hover .marker-tooltip {
+  display: block;
+}
+
+.timeline-container {
+  height: 120px;
+
+  margin-top: 25px;
+
+  display: flex;
+  flex-direction: column;
+
+  justify-content: center;
+  align-items: center;
+}
+
+.timeline-title {
+  color: #64748b;
+
+  margin-bottom: 8px;
+}
+
+.current-year {
+  font-size: 30px;
+
+  font-weight: bold;
+
+  color: #2563eb;
+
+  margin-bottom: 12px;
+}
+
+.timeline-slider {
+  width: 700px;
+  max-width: 80vw;
+
+  height: 12px;
+
+  appearance: none;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      90deg,
+      #d4af37,
+      #f4d03f
+    );
+}
+
+.timeline-slider::-webkit-slider-thumb {
+  appearance: none;
+
+  width: 28px;
+  height: 28px;
+
+  border-radius: 50%;
+
+  background: white;
+
+  border: 5px solid #1e293b;
+
+  cursor: pointer;
+}
+
+.timeline-labels {
+  width: 700px;
+  max-width: 80vw;
+
+  display: flex;
+
+  justify-content: space-between;
+
+  margin-top: 10px;
+
+  color: #64748b;
+
+  font-weight: bold;
+}
