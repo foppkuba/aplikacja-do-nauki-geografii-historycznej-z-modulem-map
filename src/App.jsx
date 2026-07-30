@@ -1,159 +1,369 @@
-import { useState, useEffect } from "react";
-
-import map1939 from "./assets/europe-1939.jpg";
-import map1940 from "./assets/europe-1940.jpg";
-import map1941 from "./assets/europe-1941.jpg";
-import map1942 from "./assets/europe-1942.jpg";
-import map1943 from "./assets/europe-1943.jpg";
-import map1944 from "./assets/europe-1944.jpg";
-import map1945 from "./assets/europe-1945.jpg";
-
-import { timelineData } from "./timelineData";
-
+import { useEffect, useRef, useState } from "react";
+import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import {
+  ArrowRight, Check, ChevronDown, Clock3, Maximize2, Minus, Plus,
+  Search, Sparkles,
+} from "lucide-react";
 import "./App.css";
 
-const years = [
-  1939,
-  1940,
-  1941,
-  1942,
-  1943,
-  1944,
-  1945,
-];
+const MIN_YEAR = 1800;
+const MAX_YEAR = 2025;
+const START_YEAR = 1939;
+const OHM_STYLE = "https://www.openhistoricalmap.org/map-styles/main/main.json";
 
-const maps = {
-  1939: map1939,
-  1940: map1940,
-  1941: map1941,
-  1942: map1942,
-  1943: map1943,
-  1944: map1944,
-  1945: map1945,
+const applyOhmYearFilter = (map, year, baseFilters) => {
+  const yearStart = Number(year);
+  const yearEnd = yearStart + 0.999999;
+
+  map.getStyle().layers.forEach((layer) => {
+    if (layer.source !== "ohm" || !layer["source-layer"]) return;
+
+    if (!baseFilters.has(layer.id)) {
+      baseFilters.set(layer.id, map.getFilter(layer.id) ?? null);
+    }
+
+    const originalFilter = baseFilters.get(layer.id);
+    const dateFilter = [
+      "all",
+      ["any", ["!", ["has", "start_decdate"]], ["<=", ["get", "start_decdate"], yearEnd]],
+      ["any", ["!", ["has", "end_decdate"]], [">=", ["get", "end_decdate"], yearStart]],
+    ];
+
+    map.setFilter(
+      layer.id,
+      originalFilter ? ["all", originalFilter, dateFilter] : dateFilter,
+    );
+  });
 };
 
-function App() {
-  const [yearIndex, setYearIndex] = useState(0);
+const addVisibleCountryBoundaries = (map) => {
+  const countryFilter = [
+    "<=",
+    ["to-number", ["get", "admin_level"], 99],
+    2,
+  ];
+  const widthByZoom = [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    2, 1.2,
+    5, 2.1,
+    8, 3.4,
+  ];
 
-  const year = years[yearIndex];
+  map.addSource("ohmAdmin", {
+    type: "vector",
+    url: "https://vtiles.openhistoricalmap.org/maps/ohm_admin.json",
+    attribution: "OpenHistoricalMap",
+  });
 
-  const currentEvents = [...timelineData[year].events].sort(
-    (a, b) => a.dateValue.localeCompare(b.dateValue)
-  );
+  map.addLayer({
+    id: "chronomap-country-fill",
+    type: "fill",
+    source: "ohmAdmin",
+    "source-layer": "boundaries",
+    filter: countryFilter,
+    paint: {
+      "fill-color": "#d88a63",
+      "fill-opacity": 0.1,
+    },
+  });
 
-  const [selectedEvent, setSelectedEvent] = useState(
-    currentEvents[0]
-  );
+  map.addLayer({
+    id: "chronomap-country-boundary-casing",
+    type: "line",
+    source: "ohmAdmin",
+    "source-layer": "boundaries",
+    filter: countryFilter,
+    paint: {
+      "line-color": "#fff9ed",
+      "line-width": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        2, 3.2,
+        5, 5,
+        8, 7,
+      ],
+      "line-opacity": 0.92,
+    },
+  });
+
+  map.addLayer({
+    id: "chronomap-country-boundary",
+    type: "line",
+    source: "ohmAdmin",
+    "source-layer": "boundaries",
+    filter: countryFilter,
+    paint: {
+      "line-color": "#7c3029",
+      "line-width": widthByZoom,
+      "line-opacity": 0.95,
+    },
+  });
+};
+
+const modules = [
+  ["QZ", "Quizy historyczne", "Sprawdzaj wiedzę na podstawie wydarzeń i miejsc widocznych na mapie."],
+  ["PR", "Twoje postępy", "Obserwuj wyniki, ukończone epoki i czas poświęcony na naukę."],
+  ["SN", "Ścieżki nauki", "Poznawaj historię krok po kroku dzięki uporządkowanym materiałom."],
+];
+
+function HistoryMap({ year }) {
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const styleReadyRef = useRef(false);
+  const baseFiltersRef = useRef(new Map());
+  const yearRef = useRef(year);
+  const [status, setStatus] = useState("loading");
+  const [ohmStatus, setOhmStatus] = useState("connecting");
 
   useEffect(() => {
-    setSelectedEvent(
-      [...timelineData[year].events].sort(
-        (a, b) => a.dateValue.localeCompare(b.dateValue)
-      )[0]
-    );
+    yearRef.current = year;
+    const map = mapRef.current;
+    if (map && styleReadyRef.current) {
+      applyOhmYearFilter(map, year, baseFiltersRef.current);
+      map.triggerRepaint();
+    }
   }, [year]);
 
-  const mapImage = maps[year];
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return undefined;
+
+    const baseFilters = baseFiltersRef.current;
+    let styleReady = false;
+    const loadTimeout = window.setTimeout(() => {
+      if (!styleReady) setStatus("error");
+    }, 15000);
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: OHM_STYLE,
+      center: [18.7, 52.1],
+      zoom: 3,
+      minZoom: 2,
+      maxZoom: 16,
+      attributionControl: false,
+    });
+
+    mapRef.current = map;
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+    map.once("style.load", () => {
+      styleReady = true;
+      styleReadyRef.current = true;
+      window.clearTimeout(loadTimeout);
+      try {
+        addVisibleCountryBoundaries(map);
+        applyOhmYearFilter(map, yearRef.current, baseFilters);
+        map.triggerRepaint();
+      } catch (error) {
+        console.warn("Nie udało się zastosować filtra daty OHM:", error);
+      }
+      setStatus("ready");
+      setOhmStatus("connected");
+    });
+    map.on("error", (event) => {
+      // MapLibre emituje ten event również dla pojedynczych brakujących
+      // kafli, glifów i ikon. Nie zasłaniamy przez to całej działającej mapy.
+      if (event?.error) console.warn("Błąd zasobu mapy:", event.error);
+    });
+
+    return () => {
+      window.clearTimeout(loadTimeout);
+      map.remove();
+      mapRef.current = null;
+      styleReadyRef.current = false;
+      baseFilters.clear();
+    };
+  }, []);
+
+  const zoom = (amount) => {
+    const map = mapRef.current;
+    if (map) map.zoomTo(map.getZoom() + amount, { duration: 350 });
+  };
+
+  const toggleFullscreen = () => {
+    const element = containerRef.current?.closest(".map-shell");
+    if (!element) return;
+    if (document.fullscreenElement) document.exitFullscreen();
+    else element.requestFullscreen();
+  };
 
   return (
-    <div className="container">
-      <div className="header">
-        <h1>NAUKA GEOGRAFII HISTORYCZNEJ</h1>
-
-        <p>
-          Interaktywna mapa wydarzeń historycznych
-        </p>
+    <div className="map-shell">
+      <div
+        ref={containerRef}
+        className="map-canvas"
+        aria-label={`Mapa historyczna dla roku ${year}`}
+      />
+      {status === "loading" && (
+        <div className="map-message">
+          <span className="loader" />
+          <strong>Wczytywanie OpenHistoricalMap…</strong>
+          <small>Pobieramy styl i kafle wektorowe OHM</small>
+        </div>
+      )}
+      {status === "error" && (
+        <div className="map-message error-message">
+          <strong className="error-code">OHM</strong>
+          <strong>Nie udało się wczytać mapy</strong>
+          <small>Sprawdź połączenie i odśwież stronę.</small>
+        </div>
+      )}
+      <div className={`map-badge ${ohmStatus === "error" ? "is-blocked" : ""}`}>
+        <span className="live-dot" />
+        {ohmStatus === "connected" && "OpenHistoricalMap — połączono"}
+        {ohmStatus === "connecting" && "Łączenie z OpenHistoricalMap…"}
+        {ohmStatus === "error" && "Problem z połączeniem OHM"}
       </div>
+      <div className="map-controls" aria-label="Sterowanie mapą">
+        <button type="button" onClick={() => zoom(1)} aria-label="Przybliż mapę"><Plus size={19} /></button>
+        <button type="button" onClick={() => zoom(-1)} aria-label="Oddal mapę"><Minus size={19} /></button>
+        <span />
+        <button type="button" onClick={toggleFullscreen} aria-label="Pełny ekran"><Maximize2 size={18} /></button>
+      </div>
+      <div className="map-date-card">
+        <Clock3 size={17} />
+        <div><small>WYBRANY ROK</small><strong>{year}</strong></div>
+      </div>
+    </div>
+  );
+}
 
-      <div className="content">
-        <div className="map-area">
-          <div className="map-wrapper">
-            <img
-              src={mapImage}
-              alt={`Mapa Europy ${year}`}
-              className="map"
-            />
+function Timeline({ year, setYear }) {
+  const progress = ((year - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * 100;
+  const quickYears = [1800, 1850, 1900, 1939, 1945, 2000, 2025];
 
-            {currentEvents.map((event) => (
-              <div
-                key={event.id}
-                className={`marker ${
-                  selectedEvent.id === event.id
-                    ? "active"
-                    : ""
-                }`}
-                style={{
-                  left: event.x,
-                  top: event.y,
-                }}
-                onClick={() =>
-                  setSelectedEvent(event)
-                }
-              >
-                <div className="marker-tooltip">
-                  {event.title}
-                </div>
-              </div>
+  return (
+    <section className="timeline-card" aria-labelledby="timeline-title">
+      <div className="timeline-heading">
+        <div>
+          <span className="section-kicker">PODRÓŻ W CZASIE</span>
+          <h2 id="timeline-title">Odkrywaj świat w wybranym roku</h2>
+        </div>
+        <label className="year-field">
+          <span>ROK</span>
+          <input
+            type="number" min={MIN_YEAR} max={MAX_YEAR} value={year}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (value >= MIN_YEAR && value <= MAX_YEAR) setYear(value);
+            }}
+          />
+        </label>
+      </div>
+      <div className="range-wrap">
+        <div className="range-track" style={{ "--progress": `${progress}%` }} />
+        <input
+          className="year-range" type="range" min={MIN_YEAR} max={MAX_YEAR}
+          value={year} onChange={(event) => setYear(Number(event.target.value))}
+          aria-label="Wybierz rok mapy historycznej"
+        />
+      </div>
+      <div className="quick-years">
+        {quickYears.map((item) => (
+          <button type="button" key={item} className={item === year ? "active" : ""} onClick={() => setYear(item)}>
+            {item}
+          </button>
+        ))}
+      </div>
+      <p className="timeline-note">
+        <Sparkles size={15} />
+        Przesuń suwak, aby zobaczyć obiekty istniejące w danym okresie.
+        Zakres danych zależy od zasobów OpenHistoricalMap.
+      </p>
+    </section>
+  );
+}
+
+function App() {
+  const [year, setYear] = useState(START_YEAR);
+  const scrollToMap = () => document.querySelector("#mapa")?.scrollIntoView({ behavior: "smooth" });
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <a className="brand" href="#start" aria-label="Chronomap — strona główna">
+          <span className="brand-mark">C</span>
+          <span><strong>Chronomap</strong><small>HISTORIA NA MAPIE</small></span>
+        </a>
+        <nav aria-label="Główna nawigacja">
+          <a className="active" href="#mapa">Mapa</a>
+          <a href="#odkrywaj">Odkrywaj</a>
+          <a href="#moduly">Quizy <span>WKRÓTCE</span></a>
+          <a href="#moduly">Postępy <span>WKRÓTCE</span></a>
+        </nav>
+        <button className="ghost-button" type="button" onClick={scrollToMap}><Search size={17} /> Przejdź do mapy</button>
+      </header>
+
+      <main>
+        <section className="hero" id="start">
+          <div className="hero-copy">
+            <h1>Historia nabiera<br /><em>kształtu na mapie.</em></h1>
+            <p>
+              Odkrywaj, jak zmieniały się granice, miasta i miejsca na przestrzeni lat.
+              Przesuń oś czasu i zobacz przeszłość z nowej perspektywy.
+            </p>
+            <div className="hero-actions">
+              <button className="primary-button" type="button" onClick={scrollToMap}>Otwórz mapę <ArrowRight size={18} /></button>
+              <a href="#odkrywaj">Jak to działa?</a>
+            </div>
+            <div className="feature-row">
+              <span><Check size={15} /> Interaktywna mapa</span>
+              <span><Check size={15} /> Dane historyczne</span>
+              <span><Check size={15} /> Oś czasu</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="map-section" id="mapa">
+          <div className="section-intro">
+            <div><span className="section-kicker">INTERAKTYWNA MAPA HISTORYCZNA</span><h2>Zobacz, jak zmieniał się świat</h2></div>
+            <p>Mapa korzysta bezpośrednio z otwartych danych OpenHistoricalMap. Możesz ją przesuwać, przybliżać i filtrować według roku.</p>
+          </div>
+          <HistoryMap year={year} />
+          <Timeline year={year} setYear={setYear} />
+        </section>
+
+        <section className="how-it-works" id="odkrywaj">
+          <div className="centered-heading">
+            <span className="section-kicker">PROSTY POCZĄTEK</span>
+            <h2>Jak działa prototyp?</h2>
+            <p>Ta wersja skupia się na najważniejszym fundamencie przyszłej aplikacji.</p>
+          </div>
+          <div className="steps">
+            <article><span>01</span><div className="step-index">I</div><h3>Wybierz rok</h3><p>Użyj suwaka pod mapą albo wybierz jedną z przygotowanych dat.</p></article>
+            <article><span>02</span><div className="step-index">II</div><h3>Eksploruj mapę</h3><p>Przesuwaj widok i przybliżaj interesujące Cię regiony świata.</p></article>
+            <article><span>03</span><div className="step-index">III</div><h3>Rozwijaj wiedzę</h3><p>W kolejnych etapach pojawią się wydarzenia, lekcje i quizy.</p></article>
+          </div>
+        </section>
+
+        <section className="future-modules" id="moduly">
+          <div className="section-intro">
+            <div><span className="section-kicker">KOLEJNE ETAPY</span><h2>Miejsce na dalszy rozwój</h2></div>
+            <p>Moduły są już uwzględnione w strukturze interfejsu. Ich zawartość zostanie dodana w następnych iteracjach projektu.</p>
+          </div>
+          <div className="module-grid">
+            {modules.map(([code, title, description]) => (
+              <article key={title} className="module-card">
+                <div className="module-code">{code}</div>
+                <small>MODUŁ W PRZYGOTOWANIU</small>
+                <h3>{title}</h3><p>{description}</p>
+                <button type="button" disabled>Dostępne wkrótce <ChevronDown size={16} /></button>
+              </article>
             ))}
           </div>
+        </section>
+      </main>
+
+      <footer>
+        <div className="brand footer-brand">
+          <span className="brand-mark">C</span>
+          <span><strong>Chronomap</strong><small>PROJEKT INŻYNIERSKI</small></span>
         </div>
-
-        <div className="events-panel">
-          {currentEvents.map((event) => (
-            <div
-              key={event.id}
-              className={`event-card ${
-                selectedEvent.id === event.id
-                  ? "active-card"
-                  : ""
-              }`}
-              onClick={() =>
-                setSelectedEvent(event)
-              }
-            >
-              <h3>{event.title}</h3>
-
-              <span className="card-date">
-                📅 {event.date}
-              </span>
-
-              <p>
-                {event.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="timeline-container">
-        <div className="timeline-title">
-          Oś czasu II wojny światowej
-        </div>
-
-        <div className="current-year">
-          {year}
-        </div>
-
-        <input
-          type="range"
-          min="0"
-          max={years.length - 1}
-          step="1"
-          value={yearIndex}
-          onChange={(e) =>
-            setYearIndex(
-              Number(e.target.value)
-            )
-          }
-          className="timeline-slider"
-        />
-
-        <div className="timeline-labels">
-          {years.map((y) => (
-            <span key={y}>{y}</span>
-          ))}
-        </div>
-      </div>
+        <p>Aplikacja edukacyjna wspomagająca naukę historii i geografii na podstawie map historycznych.</p>
+        <a href="https://www.openhistoricalmap.org/" target="_blank" rel="noreferrer">Dane mapowe: OpenHistoricalMap</a>
+      </footer>
     </div>
   );
 }
