@@ -1,5 +1,28 @@
 # React + Vite
 
+## Uruchamianie aplikacji
+
+Wymagania: zainstalowane środowisko [Node.js](https://nodejs.org/) wraz z npm.
+
+1. Otwórz terminal w katalogu projektu.
+2. Zainstaluj zależności (wystarczy zrobić to przy pierwszym uruchomieniu lub po ich zmianie):
+
+   ```bash
+   npm install
+   ```
+
+3. Uruchom serwer deweloperski:
+
+   ```bash
+   npm run dev
+   ```
+
+4. Otwórz w przeglądarce adres wyświetlony w terminalu, domyślnie:
+
+   http://localhost:5173/
+
+Serwer można zatrzymać skrótem `Ctrl+C` w terminalu.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
