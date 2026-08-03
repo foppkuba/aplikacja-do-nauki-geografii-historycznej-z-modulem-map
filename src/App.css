@@ -136,6 +136,42 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .maplibregl-ctrl-attrib { font-size: 9px; }
 .error-message { color: #8b392d; }
 
+.history-marker {
+  position: relative; width: 34px; height: 42px; padding: 0; background: transparent;
+  border: 0; cursor: pointer;
+}
+.history-marker__icon {
+  position: absolute; left: 6px; top: 3px; width: 23px; height: 23px;
+  background: var(--orange); border: 4px solid white; border-radius: 50% 50% 50% 0;
+  box-shadow: 0 3px 10px rgba(52, 42, 30, .38); transform: rotate(-45deg);
+}
+.history-marker--wydarzenie .history-marker__icon { background: var(--green); }
+.history-marker__icon::after {
+  content: ""; position: absolute; inset: 5px; background: white; border-radius: 50%;
+}
+.history-marker__pulse {
+  position: absolute; left: 8px; bottom: 0; width: 19px; height: 7px;
+  background: rgba(188, 91, 45, .25); border-radius: 50%; animation: marker-pulse 1.8s ease-out infinite;
+}
+.history-marker--wydarzenie .history-marker__pulse { background: rgba(24, 79, 69, .25); }
+@keyframes marker-pulse { 50% { transform: scale(1.45); opacity: .35; } }
+.maplibregl-popup-content { padding: 0; border-radius: 12px; box-shadow: 0 12px 35px rgba(25, 48, 41, .22); }
+.maplibregl-popup-close-button { z-index: 1; padding: 6px 9px; color: #71817d; font-size: 18px; }
+.event-popup { padding: 18px 20px 17px; color: var(--ink); }
+.event-popup__category { color: var(--orange); font-size: 8px; font-weight: 900; letter-spacing: 1.4px; }
+.event-popup h3 { margin: 5px 22px 5px 0; font: 700 18px Cambria, "Times New Roman", serif; }
+.event-popup p { margin: 8px 0 0; color: #61726e; font-size: 11px; line-height: 1.5; }
+.event-popup .event-popup__meta { margin-top: 0; color: var(--green); font-size: 9px; font-weight: 800; }
+.events-badge {
+  position: absolute; z-index: 2; left: 15px; bottom: 15px; display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; color: #667873; background: rgba(255,255,255,.92); border: 1px solid rgba(24,79,69,.12);
+  border-radius: 8px; box-shadow: 0 4px 12px rgba(29,62,53,.12); font-size: 9px; font-weight: 700;
+}
+.events-badge span {
+  display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px;
+  color: white; background: var(--orange); border-radius: 10px; font-size: 9px;
+}
+
 .timeline-card {
   position: relative; z-index: 3; max-width: 930px; margin: -34px auto 0;
   padding: 27px 34px 22px; background: var(--paper);
@@ -150,7 +186,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   width: 88px; padding: 7px 8px; color: var(--green); background: #f4f7f4;
   border: 1px solid var(--line); border-radius: 8px; font-weight: 800;
 }
-.range-wrap { position: relative; height: 30px; margin-top: 20px; }
+.range-wrap { position: relative; height: 30px; margin-top: 20px; cursor: pointer; }
 .range-track, .year-range { position: absolute; inset: 0; width: 100%; }
 .range-track {
   top: 12px; height: 5px;
@@ -163,6 +199,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
   background: white; border: 5px solid var(--orange); border-radius: 50%;
   box-shadow: 0 3px 8px rgba(116,62,37,.25); transform: translateX(-50%); pointer-events: none;
 }
+.timeline-periods {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 7px 0 12px;
+}
+.timeline-periods button {
+  min-width: 0; padding: 9px 5px 8px; color: #647773; background: #f3f6f3;
+  border: 1px solid #e3e9e5; border-radius: 8px; cursor: pointer; line-height: 1.15;
+  transition: color .2s, background .2s, border-color .2s, transform .2s;
+}
+.timeline-periods button:hover { border-color: #b8cbc4; transform: translateY(-1px); }
+.timeline-periods button.active { color: white; background: var(--green); border-color: var(--green); }
+.timeline-periods strong, .timeline-periods span { display: block; }
+.timeline-periods strong { font-size: 8px; }
+.timeline-periods span { margin-top: 4px; font-size: 7px; opacity: .75; }
 .quick-years { display: flex; justify-content: space-between; }
 .quick-years button {
   padding: 4px 7px; color: #81908d; background: transparent; border: 0;
@@ -240,6 +289,8 @@ footer > a { color: var(--green); font-size: 10px; font-weight: 800; text-align:
   .timeline-card { margin-left: 8px; margin-right: 8px; padding: 22px 20px 18px; }
   .timeline-heading { align-items: flex-start; gap: 18px; }
   .timeline-heading h2 { font-size: 19px; }
+  .timeline-periods { grid-template-columns: repeat(2, 1fr); }
+  .timeline-periods strong { font-size: 9px; }
   .quick-years button:nth-child(even) { display: none; }
   .timeline-note { align-items: flex-start; line-height: 1.5; }
 }

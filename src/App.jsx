@@ -6,11 +6,59 @@ import {
   Search, Sparkles,
 } from "lucide-react";
 import "./App.css";
+import { events } from "./events";
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
 const START_YEAR = 1939;
 const OHM_STYLE = "https://www.openhistoricalmap.org/map-styles/main/main.json";
+
+const TIMELINE_PERIODS = [
+  { label: "XIX wiek", range: "1800–1913", start: 1800, end: 1913 },
+  { label: "I wojna światowa", range: "1914–1918", start: 1914, end: 1918 },
+  { label: "Dwudziestolecie", range: "1919–1938", start: 1919, end: 1938 },
+  { label: "II wojna światowa", range: "1939–1945", start: 1939, end: 1945 },
+  { label: "Zimna wojna", range: "1946–1991", start: 1946, end: 1991 },
+  { label: "Współczesność", range: "1992–2025", start: 1992, end: 2025 },
+];
+
+const updateEventMarkers = (map, year, markerStore) => {
+  markerStore.forEach((marker) => marker.remove());
+  markerStore.length = 0;
+
+  const visibleEvents = events.filter((event) => event.year === Number(year));
+  visibleEvents.forEach((event) => {
+    const markerElement = document.createElement("button");
+    markerElement.type = "button";
+    markerElement.className = `history-marker history-marker--${event.type}`;
+    markerElement.setAttribute("aria-label", `${event.title}, ${event.place}`);
+    markerElement.innerHTML = '<span class="history-marker__pulse"></span><span class="history-marker__icon"></span>';
+
+    const popupContent = document.createElement("article");
+    popupContent.className = "event-popup";
+    const category = document.createElement("span");
+    category.className = "event-popup__category";
+    category.textContent = event.type === "bitwa" ? "BITWA" : "WYDARZENIE";
+    const title = document.createElement("h3");
+    title.textContent = event.title;
+    const meta = document.createElement("p");
+    meta.className = "event-popup__meta";
+    meta.textContent = `${event.date} · ${event.place}`;
+    const description = document.createElement("p");
+    description.textContent = event.description;
+    popupContent.append(category, title, meta, description);
+
+    const popup = new maplibregl.Popup({ offset: 22, maxWidth: "310px", closeButton: true })
+      .setDOMContent(popupContent);
+    const marker = new maplibregl.Marker({ element: markerElement, anchor: "bottom" })
+      .setLngLat(event.coordinates)
+      .setPopup(popup)
+      .addTo(map);
+    markerStore.push(marker);
+  });
+
+  return visibleEvents.length;
+};
 
 const applyOhmYearFilter = (map, year, baseFilters) => {
   const yearStart = Number(year);
@@ -116,8 +164,10 @@ function HistoryMap({ year }) {
   const styleReadyRef = useRef(false);
   const baseFiltersRef = useRef(new Map());
   const yearRef = useRef(year);
+  const eventMarkersRef = useRef([]);
   const [status, setStatus] = useState("loading");
   const [ohmStatus, setOhmStatus] = useState("connecting");
+  const [eventCount, setEventCount] = useState(0);
 
   useEffect(() => {
     yearRef.current = year;
@@ -126,6 +176,7 @@ function HistoryMap({ year }) {
       applyOhmYearFilter(map, year, baseFiltersRef.current);
       map.triggerRepaint();
     }
+    if (map) setEventCount(updateEventMarkers(map, year, eventMarkersRef.current));
   }, [year]);
 
   useEffect(() => {
@@ -147,6 +198,7 @@ function HistoryMap({ year }) {
     });
 
     mapRef.current = map;
+    setEventCount(updateEventMarkers(map, yearRef.current, eventMarkersRef.current));
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.once("style.load", () => {
       styleReady = true;
@@ -170,6 +222,8 @@ function HistoryMap({ year }) {
 
     return () => {
       window.clearTimeout(loadTimeout);
+      eventMarkersRef.current.forEach((marker) => marker.remove());
+      eventMarkersRef.current = [];
       map.remove();
       mapRef.current = null;
       styleReadyRef.current = false;
@@ -216,6 +270,10 @@ function HistoryMap({ year }) {
         {ohmStatus === "connecting" && "Łączenie z OpenHistoricalMap…"}
         {ohmStatus === "error" && "Problem z połączeniem OHM"}
       </div>
+      <div className="events-badge">
+        <span>{eventCount}</span>
+        {eventCount === 1 ? "wydarzenie w tym roku" : "wydarzenia w tym roku"}
+      </div>
       <div className="map-controls" aria-label="Sterowanie mapą">
         <button type="button" onClick={() => zoom(1)} aria-label="Przybliż mapę"><Plus size={19} /></button>
         <button type="button" onClick={() => zoom(-1)} aria-label="Oddal mapę"><Minus size={19} /></button>
@@ -233,6 +291,7 @@ function HistoryMap({ year }) {
 function Timeline({ year, setYear }) {
   const progress = ((year - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * 100;
   const quickYears = [1800, 1850, 1900, 1939, 1945, 2000, 2025];
+  const activePeriod = TIMELINE_PERIODS.find((period) => year >= period.start && year <= period.end);
 
   return (
     <section className="timeline-card" aria-labelledby="timeline-title">
@@ -252,13 +311,27 @@ function Timeline({ year, setYear }) {
           />
         </label>
       </div>
-      <div className="range-wrap">
-        <div className="range-track" style={{ "--progress": `${progress}%` }} />
+      <div className="range-wrap" style={{ "--progress": `${progress}%` }}>
+        <div className="range-track" />
         <input
           className="year-range" type="range" min={MIN_YEAR} max={MAX_YEAR}
           value={year} onChange={(event) => setYear(Number(event.target.value))}
           aria-label="Wybierz rok mapy historycznej"
         />
+      </div>
+      <div className="timeline-periods" aria-label="Okresy historyczne">
+        {TIMELINE_PERIODS.map((period) => (
+          <button
+            type="button"
+            key={period.label}
+            className={activePeriod?.label === period.label ? "active" : ""}
+            onClick={() => setYear(period.start)}
+            aria-pressed={activePeriod?.label === period.label}
+          >
+            <strong>{period.label}</strong>
+            <span>{period.range}</span>
+          </button>
+        ))}
       </div>
       <div className="quick-years">
         {quickYears.map((item) => (
