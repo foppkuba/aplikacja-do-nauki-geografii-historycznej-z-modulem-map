@@ -171,6 +171,27 @@ button, a { -webkit-tap-highlight-color: transparent; }
   display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px;
   color: white; background: var(--orange); border-radius: 10px; font-size: 9px;
 }
+.campaign-arrow {
+  width: 0; height: 0; padding: 0; background: transparent; border: 0;
+  border-top: 8px solid transparent; border-bottom: 8px solid transparent;
+  border-left: 18px solid #c94836; cursor: pointer;
+  filter: drop-shadow(0 2px 2px rgba(40, 25, 20, .35));
+  transform: rotate(var(--arrow-angle)); transform-origin: center;
+}
+.campaign-arrow--ussr { border-left-color: #8e2635; }
+.campaign-arrow--poland { border-left-color: #24649a; }
+.campaign-popup .event-popup__category { color: #8e2635; }
+.campaign-legend {
+  position: absolute; z-index: 2; right: 72px; top: 18px; display: flex; flex-direction: column; gap: 7px;
+  width: 168px; padding: 12px 13px; color: #526560; background: rgba(255,255,255,.94);
+  border: 1px solid rgba(24,79,69,.12); border-radius: 9px; box-shadow: 0 6px 18px rgba(29,62,53,.14);
+}
+.campaign-legend strong { color: var(--ink); font: 700 13px Cambria, "Times New Roman", serif; }
+.campaign-legend span { display: flex; align-items: center; gap: 7px; font-size: 8px; font-weight: 700; }
+.campaign-legend small { padding-top: 4px; color: #81908c; border-top: 1px solid #e8ece9; font-size: 7px; }
+.legend-line { width: 24px; height: 3px; background: #c94836; border-radius: 3px; }
+.legend-line--ussr { background: #8e2635; }
+.legend-line--poland { background: #24649a; }
 
 .timeline-card {
   position: relative; z-index: 3; max-width: 930px; margin: -34px auto 0;
@@ -286,6 +307,7 @@ footer > a { color: var(--green); font-size: 10px; font-weight: 800; text-align:
   .feature-row { gap: 10px 16px; }
   .map-section, .future-modules, .how-it-works { padding-left: 18px; padding-right: 18px; }
   .map-shell { height: 480px; border-width: 5px; }
+  .campaign-legend { right: 64px; top: 18px; width: 150px; }
   .timeline-card { margin-left: 8px; margin-right: 8px; padding: 22px 20px 18px; }
   .timeline-heading { align-items: flex-start; gap: 18px; }
   .timeline-heading h2 { font-size: 19px; }

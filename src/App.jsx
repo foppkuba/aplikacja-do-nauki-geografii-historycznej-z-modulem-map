@@ -7,11 +7,13 @@ import {
 } from "lucide-react";
 import "./App.css";
 import { events } from "./events";
+import { septemberCampaignArrowheads, septemberCampaignRoutes } from "./septemberCampaign";
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
 const START_YEAR = 1939;
 const OHM_STYLE = "https://www.openhistoricalmap.org/map-styles/main/main.json";
+const EUROPE_BOUNDS = [[-25, 34], [45, 72]];
 
 const TIMELINE_PERIODS = [
   { label: "XIX wiek", range: "1800–1913", start: 1800, end: 1913 },
@@ -58,6 +60,71 @@ const updateEventMarkers = (map, year, markerStore) => {
   });
 
   return visibleEvents.length;
+};
+
+const campaignColors = { germany: "#c94836", ussr: "#8e2635", poland: "#24649a" };
+
+const addSeptemberCampaignLayers = (map) => {
+  if (map.getSource("september-campaign")) return;
+  map.addSource("september-campaign", { type: "geojson", data: septemberCampaignRoutes });
+  const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+
+  Object.entries(campaignColors).forEach(([side, color]) => {
+    map.addLayer({
+      id: `september-campaign-${side}`,
+      type: "line",
+      source: "september-campaign",
+      filter: ["==", ["get", "side"], side],
+      layout: { "line-cap": "round", "line-join": "round", visibility: "visible" },
+      paint: {
+        "line-color": color,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 3, 3, 7, 7],
+        "line-opacity": 0.88,
+        "line-dasharray": side === "poland" ? [1.5, 1.1] : [2.3, 1.2],
+      },
+    }, firstSymbolLayer);
+  });
+};
+
+const setSeptemberCampaignVisibility = (map, year) => {
+  Object.keys(campaignColors).forEach((side) => {
+    const layerId = `september-campaign-${side}`;
+    if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", Number(year) === 1939 ? "visible" : "none");
+  });
+};
+
+const updateCampaignArrowheads = (map, year, markerStore) => {
+  markerStore.forEach((marker) => marker.remove());
+  markerStore.length = 0;
+  if (Number(year) !== 1939) return;
+
+  septemberCampaignArrowheads.forEach((arrow) => {
+    const [lng, lat] = arrow.coordinates;
+    const [previousLng, previousLat] = arrow.previousCoordinates;
+    const angle = Math.atan2(lat - previousLat, lng - previousLng) * (180 / Math.PI);
+    const element = document.createElement("button");
+    element.type = "button";
+    element.className = `campaign-arrow campaign-arrow--${arrow.side}`;
+    element.style.setProperty("--arrow-angle", `${-angle}deg`);
+    element.setAttribute("aria-label", arrow.title);
+
+    const popupContent = document.createElement("article");
+    popupContent.className = "event-popup campaign-popup";
+    const category = document.createElement("span");
+    category.className = "event-popup__category";
+    category.textContent = "KAMPANIA WRZEŚNIOWA";
+    const title = document.createElement("h3");
+    title.textContent = arrow.title;
+    const description = document.createElement("p");
+    description.textContent = arrow.description;
+    popupContent.append(category, title, description);
+
+    const marker = new maplibregl.Marker({ element, anchor: "center", rotationAlignment: "map" })
+      .setLngLat([lng, lat])
+      .setPopup(new maplibregl.Popup({ offset: 18, maxWidth: "300px" }).setDOMContent(popupContent))
+      .addTo(map);
+    markerStore.push(marker);
+  });
 };
 
 const applyOhmYearFilter = (map, year, baseFilters) => {
@@ -152,6 +219,35 @@ const addVisibleCountryBoundaries = (map) => {
   });
 };
 
+const localizeCountryLabels = (map) => {
+  const polishName = [
+    "coalesce",
+    ["get", "name:pl"],
+    ["get", "name_pl"],
+    ["get", "name"],
+    ["get", "name:en"],
+    ["get", "name_en"],
+  ];
+  const countryLayerPattern = /country|countries|nation|admin(?:istrative)?[-_ ]?(?:0|1|2|label)|boundary.*label/i;
+
+  map.getStyle().layers.forEach((layer) => {
+    if (layer.type !== "symbol" || !layer.layout?.["text-field"]) return;
+
+    const layerDescription = [
+      layer.id,
+      layer["source-layer"],
+      JSON.stringify(layer.filter ?? ""),
+    ].join(" ");
+    if (!countryLayerPattern.test(layerDescription)) return;
+
+    try {
+      map.setLayoutProperty(layer.id, "text-field", polishName);
+    } catch (error) {
+      console.warn(`Nie udało się spolszczyć warstwy ${layer.id}:`, error);
+    }
+  });
+};
+
 const modules = [
   ["QZ", "Quizy historyczne", "Sprawdzaj wiedzę na podstawie wydarzeń i miejsc widocznych na mapie."],
   ["PR", "Twoje postępy", "Obserwuj wyniki, ukończone epoki i czas poświęcony na naukę."],
@@ -165,6 +261,7 @@ function HistoryMap({ year }) {
   const baseFiltersRef = useRef(new Map());
   const yearRef = useRef(year);
   const eventMarkersRef = useRef([]);
+  const campaignMarkersRef = useRef([]);
   const [status, setStatus] = useState("loading");
   const [ohmStatus, setOhmStatus] = useState("connecting");
   const [eventCount, setEventCount] = useState(0);
@@ -174,9 +271,11 @@ function HistoryMap({ year }) {
     const map = mapRef.current;
     if (map && styleReadyRef.current) {
       applyOhmYearFilter(map, year, baseFiltersRef.current);
+      setSeptemberCampaignVisibility(map, year);
       map.triggerRepaint();
     }
     if (map) setEventCount(updateEventMarkers(map, year, eventMarkersRef.current));
+    if (map) updateCampaignArrowheads(map, year, campaignMarkersRef.current);
   }, [year]);
 
   useEffect(() => {
@@ -194,11 +293,14 @@ function HistoryMap({ year }) {
       zoom: 3,
       minZoom: 2,
       maxZoom: 16,
+      maxBounds: EUROPE_BOUNDS,
+      renderWorldCopies: false,
       attributionControl: false,
     });
 
     mapRef.current = map;
     setEventCount(updateEventMarkers(map, yearRef.current, eventMarkersRef.current));
+    updateCampaignArrowheads(map, yearRef.current, campaignMarkersRef.current);
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.once("style.load", () => {
       styleReady = true;
@@ -206,6 +308,9 @@ function HistoryMap({ year }) {
       window.clearTimeout(loadTimeout);
       try {
         addVisibleCountryBoundaries(map);
+        localizeCountryLabels(map);
+        addSeptemberCampaignLayers(map);
+        setSeptemberCampaignVisibility(map, yearRef.current);
         applyOhmYearFilter(map, yearRef.current, baseFilters);
         map.triggerRepaint();
       } catch (error) {
@@ -224,6 +329,8 @@ function HistoryMap({ year }) {
       window.clearTimeout(loadTimeout);
       eventMarkersRef.current.forEach((marker) => marker.remove());
       eventMarkersRef.current = [];
+      campaignMarkersRef.current.forEach((marker) => marker.remove());
+      campaignMarkersRef.current = [];
       map.remove();
       mapRef.current = null;
       styleReadyRef.current = false;
@@ -274,6 +381,15 @@ function HistoryMap({ year }) {
         <span>{eventCount}</span>
         {eventCount === 1 ? "wydarzenie w tym roku" : "wydarzenia w tym roku"}
       </div>
+      {year === 1939 && (
+        <div className="campaign-legend" aria-label="Legenda kampanii wrześniowej">
+          <strong>Kampania wrześniowa</strong>
+          <span><i className="legend-line legend-line--germany" />Natarcie niemieckie</span>
+          <span><i className="legend-line legend-line--ussr" />Natarcie ZSRR od 17 IX</span>
+          <span><i className="legend-line legend-line--poland" />Polska kontrofensywa</span>
+          <small>Schemat głównych kierunków działań</small>
+        </div>
+      )}
       <div className="map-controls" aria-label="Sterowanie mapą">
         <button type="button" onClick={() => zoom(1)} aria-label="Przybliż mapę"><Plus size={19} /></button>
         <button type="button" onClick={() => zoom(-1)} aria-label="Oddal mapę"><Minus size={19} /></button>
