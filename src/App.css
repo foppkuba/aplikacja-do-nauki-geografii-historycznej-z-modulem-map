@@ -219,10 +219,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
   border-top: 8px solid transparent; border-bottom: 8px solid transparent;
   border-left: 18px solid #c94836; cursor: pointer;
   filter: drop-shadow(0 2px 2px rgba(40, 25, 20, .35));
-  transform: rotate(var(--arrow-angle)); transform-origin: center;
+  transform-origin: center;
 }
 .campaign-arrow--ussr { border-left-color: #8e2635; }
-.campaign-arrow--poland { border-left-color: #24649a; }
+.campaign-arrow--allies { border-left-color: #24649a; }
 .campaign-popup .event-popup__category { color: #8e2635; }
 .campaign-legend {
   position: absolute; z-index: 2; right: 72px; top: 18px; display: flex; flex-direction: column; gap: 7px;
@@ -234,7 +234,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .campaign-legend small { padding-top: 4px; color: #81908c; border-top: 1px solid #e8ece9; font-size: 7px; }
 .legend-line { width: 24px; height: 3px; background: #c94836; border-radius: 3px; }
 .legend-line--ussr { background: #8e2635; }
-.legend-line--poland { background: #24649a; }
+.legend-line--allies { background: #24649a; }
 
 .timeline-card {
   position: relative; z-index: 3; max-width: 930px; margin: -34px auto 0;
@@ -263,6 +263,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
   background: white; border: 5px solid var(--orange); border-radius: 50%;
   box-shadow: 0 3px 8px rgba(116,62,37,.25); transform: translateX(-50%); pointer-events: none;
 }
+.ww2-month-timeline {
+  margin: 2px 0 14px; padding: 13px 15px 10px; background: #f4f7f4;
+  border: 1px solid #dfe8e3; border-radius: 10px;
+}
+.ww2-month-timeline__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ww2-month-timeline__heading strong { color: var(--green); font: 700 16px Cambria, "Times New Roman", serif; text-transform: capitalize; }
+.ww2-month-timeline__heading span { color: #788a86; font-size: 8px; font-weight: 800; letter-spacing: .35px; }
+.ww2-month-range { width: 100%; margin: 12px 0 3px; accent-color: var(--orange); cursor: pointer; }
+.ww2-month-timeline__scale { display: flex; justify-content: space-between; color: #82918d; font-size: 7px; font-weight: 800; }
 .timeline-periods {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 7px 0 12px;
 }
