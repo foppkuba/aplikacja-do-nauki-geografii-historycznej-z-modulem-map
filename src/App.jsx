@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
-  ArrowRight, Check, ChevronDown, Clock3, Maximize2, Minus, Plus,
-  Search, Sparkles,
+  ArrowRight, Check, ChevronDown, Clock3, Filter, Maximize2, Minus, Plus,
+  RotateCcw, Search, Sparkles,
 } from "lucide-react";
 import "./App.css";
 import { events } from "./events";
@@ -14,6 +14,17 @@ const MAX_YEAR = 2025;
 const START_YEAR = 1939;
 const OHM_STYLE = "https://www.openhistoricalmap.org/map-styles/main/main.json";
 const EUROPE_BOUNDS = [[-25, 34], [45, 72]];
+const isEventInEurope = ({ coordinates: [longitude, latitude] }) => (
+  longitude >= EUROPE_BOUNDS[0][0]
+  && longitude <= EUROPE_BOUNDS[1][0]
+  && latitude >= EUROPE_BOUNDS[0][1]
+  && latitude <= EUROPE_BOUNDS[1][1]
+);
+const EUROPEAN_EVENTS = events.filter(isEventInEurope);
+const EVENT_COUNTRIES = [...new Set(EUROPEAN_EVENTS.map((event) => event.country))]
+  .sort((first, second) => first.localeCompare(second, "pl"));
+const EVENT_CATEGORIES = [...new Set(EUROPEAN_EVENTS.map((event) => event.category))]
+  .sort((first, second) => first.localeCompare(second, "pl"));
 
 const TIMELINE_PERIODS = [
   { label: "XIX wiek", range: "1800–1913", start: 1800, end: 1913 },
@@ -24,11 +35,15 @@ const TIMELINE_PERIODS = [
   { label: "Współczesność", range: "1992–2025", start: 1992, end: 2025 },
 ];
 
-const updateEventMarkers = (map, year, markerStore) => {
+const updateEventMarkers = (map, year, markerStore, filters = {}) => {
   markerStore.forEach((marker) => marker.remove());
   markerStore.length = 0;
 
-  const visibleEvents = events.filter((event) => event.year === Number(year));
+  const visibleEvents = EUROPEAN_EVENTS.filter((event) => (
+    event.year === Number(year)
+    && (!filters.country || event.country === filters.country)
+    && (!filters.category || event.category === filters.category)
+  ));
   visibleEvents.forEach((event) => {
     const markerElement = document.createElement("button");
     markerElement.type = "button";
@@ -43,12 +58,21 @@ const updateEventMarkers = (map, year, markerStore) => {
     category.textContent = event.type === "bitwa" ? "BITWA" : "WYDARZENIE";
     const title = document.createElement("h3");
     title.textContent = event.title;
+    const tags = document.createElement("div");
+    tags.className = "event-popup__tags";
+    const countryTag = document.createElement("span");
+    countryTag.className = "event-popup__tag event-popup__tag--country";
+    countryTag.textContent = `Państwo: ${event.country}`;
+    const categoryTag = document.createElement("span");
+    categoryTag.className = "event-popup__tag event-popup__tag--category";
+    categoryTag.textContent = `Kategoria: ${event.category}`;
+    tags.append(countryTag, categoryTag);
     const meta = document.createElement("p");
     meta.className = "event-popup__meta";
     meta.textContent = `${event.date} · ${event.place}`;
     const description = document.createElement("p");
     description.textContent = event.description;
-    popupContent.append(category, title, meta, description);
+    popupContent.append(category, title, tags, meta, description);
 
     const popup = new maplibregl.Popup({ offset: 22, maxWidth: "310px", closeButton: true })
       .setDOMContent(popupContent);
@@ -254,12 +278,57 @@ const modules = [
   ["SN", "Ścieżki nauki", "Poznawaj historię krok po kroku dzięki uporządkowanym materiałom."],
 ];
 
-function HistoryMap({ year }) {
+function EventFilters({ countryFilter, categoryFilter, setCountryFilter, setCategoryFilter }) {
+  const hasActiveFilters = Boolean(countryFilter || categoryFilter);
+
+  return (
+    <div className="event-filters" aria-label="Filtry wydarzeń historycznych">
+      <div className="event-filters__title">
+        <span className="event-filters__icon"><Filter size={16} /></span>
+        <div><strong>Filtruj wydarzenia</strong><small>Wybierz państwo lub kategorię</small></div>
+      </div>
+      <label className="event-filter-field">
+        <span>PAŃSTWO</span>
+        <span className="event-filter-select">
+          <select value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
+            <option value="">Wszystkie państwa</option>
+            {EVENT_COUNTRIES.map((country) => <option key={country} value={country}>{country}</option>)}
+          </select>
+          <ChevronDown size={14} aria-hidden="true" />
+        </span>
+      </label>
+      <label className="event-filter-field">
+        <span>KATEGORIA</span>
+        <span className="event-filter-select">
+          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+            <option value="">Wszystkie kategorie</option>
+            {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <ChevronDown size={14} aria-hidden="true" />
+        </span>
+      </label>
+      <button
+        className="event-filters__reset"
+        type="button"
+        disabled={!hasActiveFilters}
+        onClick={() => {
+          setCountryFilter("");
+          setCategoryFilter("");
+        }}
+      >
+        <RotateCcw size={14} /> Wyczyść
+      </button>
+    </div>
+  );
+}
+
+function HistoryMap({ year, countryFilter, categoryFilter }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const styleReadyRef = useRef(false);
   const baseFiltersRef = useRef(new Map());
   const yearRef = useRef(year);
+  const filtersRef = useRef({ country: countryFilter, category: categoryFilter });
   const eventMarkersRef = useRef([]);
   const campaignMarkersRef = useRef([]);
   const [status, setStatus] = useState("loading");
@@ -268,15 +337,18 @@ function HistoryMap({ year }) {
 
   useEffect(() => {
     yearRef.current = year;
+    filtersRef.current = { country: countryFilter, category: categoryFilter };
     const map = mapRef.current;
     if (map && styleReadyRef.current) {
       applyOhmYearFilter(map, year, baseFiltersRef.current);
       setSeptemberCampaignVisibility(map, year);
       map.triggerRepaint();
     }
-    if (map) setEventCount(updateEventMarkers(map, year, eventMarkersRef.current));
+    if (map) {
+      setEventCount(updateEventMarkers(map, year, eventMarkersRef.current, filtersRef.current));
+    }
     if (map) updateCampaignArrowheads(map, year, campaignMarkersRef.current);
-  }, [year]);
+  }, [year, countryFilter, categoryFilter]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
@@ -299,7 +371,7 @@ function HistoryMap({ year }) {
     });
 
     mapRef.current = map;
-    setEventCount(updateEventMarkers(map, yearRef.current, eventMarkersRef.current));
+    setEventCount(updateEventMarkers(map, yearRef.current, eventMarkersRef.current, filtersRef.current));
     updateCampaignArrowheads(map, yearRef.current, campaignMarkersRef.current);
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.once("style.load", () => {
@@ -377,9 +449,13 @@ function HistoryMap({ year }) {
         {ohmStatus === "connecting" && "Łączenie z OpenHistoricalMap…"}
         {ohmStatus === "error" && "Problem z połączeniem OHM"}
       </div>
-      <div className="events-badge">
+      <div className="events-badge" aria-live="polite">
         <span>{eventCount}</span>
-        {eventCount === 1 ? "wydarzenie w tym roku" : "wydarzenia w tym roku"}
+        {eventCount === 1
+          ? "wydarzenie w tym roku"
+          : eventCount >= 2 && eventCount <= 4
+            ? "wydarzenia w tym roku"
+            : "wydarzeń w tym roku"}
       </div>
       {year === 1939 && (
         <div className="campaign-legend" aria-label="Legenda kampanii wrześniowej">
@@ -467,6 +543,8 @@ function Timeline({ year, setYear }) {
 
 function App() {
   const [year, setYear] = useState(START_YEAR);
+  const [countryFilter, setCountryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const scrollToMap = () => document.querySelector("#mapa")?.scrollIntoView({ behavior: "smooth" });
 
   return (
@@ -507,10 +585,16 @@ function App() {
 
         <section className="map-section" id="mapa">
           <div className="section-intro">
-            <div><span className="section-kicker">INTERAKTYWNA MAPA HISTORYCZNA</span><h2>Zobacz, jak zmieniał się świat</h2></div>
-            <p>Mapa korzysta bezpośrednio z otwartych danych OpenHistoricalMap. Możesz ją przesuwać, przybliżać i filtrować według roku.</p>
+            <div><span className="section-kicker">INTERAKTYWNA MAPA HISTORYCZNA</span><h2>Zobacz, jak zmieniała się Europa</h2></div>
+            <p>Mapa korzysta bezpośrednio z otwartych danych OpenHistoricalMap. Możesz ją przesuwać, przybliżać i filtrować według roku, państwa oraz kategorii.</p>
           </div>
-          <HistoryMap year={year} />
+          <EventFilters
+            countryFilter={countryFilter}
+            categoryFilter={categoryFilter}
+            setCountryFilter={setCountryFilter}
+            setCategoryFilter={setCategoryFilter}
+          />
+          <HistoryMap year={year} countryFilter={countryFilter} categoryFilter={categoryFilter} />
           <Timeline year={year} setYear={setYear} />
         </section>
 

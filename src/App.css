@@ -81,6 +81,43 @@ button, a { -webkit-tap-highlight-color: transparent; }
   margin: 8px 0 0; font-family: Cambria, "Times New Roman", serif; font-size: 33px; font-weight: 600; letter-spacing: -.7px;
 }
 .section-intro > p { max-width: 450px; margin: 0; color: #647872; font-size: 12px; line-height: 1.7; }
+.event-filters {
+  display: flex; align-items: flex-end; gap: 12px; margin: -8px 0 16px; padding: 12px 14px;
+  background: rgba(255,253,248,.92); border: 1px solid rgba(24,79,69,.1); border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(34,70,61,.08);
+}
+.event-filters__title {
+  min-width: 190px; display: flex; align-items: center; gap: 10px; margin-right: auto; padding-bottom: 2px;
+}
+.event-filters__icon {
+  width: 34px; height: 34px; display: grid; flex: 0 0 auto; place-items: center;
+  color: var(--orange); background: #fae9de; border-radius: 9px;
+}
+.event-filters__title > div { display: flex; flex-direction: column; gap: 3px; }
+.event-filters__title strong { color: var(--ink); font-size: 11px; }
+.event-filters__title small { color: #7a8985; font-size: 8px; }
+.event-filter-field { min-width: 165px; display: flex; flex-direction: column; gap: 4px; }
+.event-filter-field > span:first-child {
+  color: #778984; font-size: 7px; font-weight: 900; letter-spacing: 1px;
+}
+.event-filter-select { position: relative; display: block; }
+.event-filter-select select {
+  width: 100%; height: 36px; appearance: none; padding: 0 34px 0 11px; color: var(--green);
+  background: #f4f7f4; border: 1px solid var(--line); border-radius: 8px; outline: 0;
+  cursor: pointer; font-size: 10px; font-weight: 800;
+}
+.event-filter-select select:hover { border-color: #b8c9c2; }
+.event-filter-select select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(24,79,69,.1); }
+.event-filter-select svg {
+  position: absolute; top: 50%; right: 10px; color: #71847e; pointer-events: none; transform: translateY(-50%);
+}
+.event-filters__reset {
+  height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px;
+  color: var(--green); background: var(--green-light); border: 0; border-radius: 8px;
+  cursor: pointer; font-size: 9px; font-weight: 800;
+}
+.event-filters__reset:not(:disabled):hover { background: #d2e6de; }
+.event-filters__reset:disabled { cursor: default; opacity: .42; }
 .map-shell {
   position: relative; height: 570px; overflow: hidden; background: #dce9df;
   border: 8px solid white; border-radius: 20px; box-shadow: 0 24px 55px rgba(34,70,61,.14);
@@ -162,6 +199,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .event-popup h3 { margin: 5px 22px 5px 0; font: 700 18px Cambria, "Times New Roman", serif; }
 .event-popup p { margin: 8px 0 0; color: #61726e; font-size: 11px; line-height: 1.5; }
 .event-popup .event-popup__meta { margin-top: 0; color: var(--green); font-size: 9px; font-weight: 800; }
+.event-popup__tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+.event-popup__tag {
+  padding: 4px 7px; color: var(--green); background: var(--green-light); border-radius: 999px;
+  font-size: 7px; font-weight: 900; letter-spacing: .25px;
+}
+.event-popup__tag--category { color: #9a4e2b; background: #fae9de; }
 .events-badge {
   position: absolute; z-index: 2; left: 15px; bottom: 15px; display: flex; align-items: center; gap: 6px;
   padding: 7px 10px; color: #667873; background: rgba(255,255,255,.92); border: 1px solid rgba(24,79,69,.12);
@@ -293,6 +336,9 @@ footer > a { color: var(--green); font-size: 10px; font-weight: 800; text-align:
   .topbar nav { display: none; }
   .hero { padding-top: 54px; }
   .section-intro { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .event-filters { flex-wrap: wrap; }
+  .event-filters__title { flex: 1 0 100%; margin-right: 0; }
+  .event-filter-field { flex: 1; }
   .map-shell { height: 500px; }
   .steps, .module-grid { grid-template-columns: 1fr; }
   footer { grid-template-columns: 1fr; justify-items: center; }
@@ -306,6 +352,9 @@ footer > a { color: var(--green); font-size: 10px; font-weight: 800; text-align:
   .hero h1 { font-size: 45px; letter-spacing: -2px; }
   .feature-row { gap: 10px 16px; }
   .map-section, .future-modules, .how-it-works { padding-left: 18px; padding-right: 18px; }
+  .event-filters { gap: 10px; padding: 12px; }
+  .event-filter-field { min-width: 0; flex-basis: calc(50% - 5px); }
+  .event-filters__reset { width: 100%; }
   .map-shell { height: 480px; border-width: 5px; }
   .campaign-legend { right: 64px; top: 18px; width: 150px; }
   .timeline-card { margin-left: 8px; margin-right: 8px; padding: 22px 20px 18px; }
