@@ -53,7 +53,7 @@ a konto identyfikuje para `auth_provider` + `auth_provider_subject`.
 
 ## Model wydarzenia
 
-Obecne pola z `src/events.js` mapują się następująco:
+Pola DTO zwracanego przez API mapują się następująco:
 
 | Obecne pole | Kolumna w bazie |
 |---|---|
@@ -96,9 +96,9 @@ mapy (`bbox`). Indeksy w schemacie obsługują oba rodzaje filtrowania.
 2. Dodać backend (np. Node.js + Fastify/Express) i konfigurację przez zmienne
    środowiskowe; sekretów nie umieszczać w repozytorium.
 3. Zaimplementować rejestrację, logowanie, odświeżanie i wylogowanie.
-4. Napisać jednorazowy importer `events.js`, `timelineData.js` i tras kampanii.
-5. Zastąpić import `events.js` wywołaniem API, zachowując dotychczasowy format DTO,
-   aby ograniczyć zmiany w komponencie mapy.
+4. Przechowywać wydarzenia wyłącznie w `historical_events`; dodawać i zmieniać je
+   przez SQL lub endpointy edytorskie API.
+5. Wczytywać wydarzenia przez API, zachowując format DTO wymagany przez komponent mapy.
 6. Dodać panel redaktora i postęp użytkownika.
 
 Quizy i lekcje warto dodać w drugiej migracji, gdy ich format w interfejsie będzie

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
@@ -6,7 +6,7 @@ import {
   RotateCcw, Search, Sparkles,
 } from "lucide-react";
 import "./App.css";
-import { events } from "./events";
+import { fetchEvents } from "./api/events";
 import { getActiveCampaignRoutes, getCampaignArrowheads } from "./ww2Campaigns";
 
 const MIN_YEAR = 1800;
@@ -32,12 +32,6 @@ const isEventInEurope = ({ coordinates: [longitude, latitude] }) => (
   && latitude >= EUROPE_BOUNDS[0][1]
   && latitude <= EUROPE_BOUNDS[1][1]
 );
-const EUROPEAN_EVENTS = events.filter(isEventInEurope);
-const EVENT_COUNTRIES = [...new Set(EUROPEAN_EVENTS.map((event) => event.country))]
-  .sort((first, second) => first.localeCompare(second, "pl"));
-const EVENT_CATEGORIES = [...new Set(EUROPEAN_EVENTS.map((event) => event.category))]
-  .sort((first, second) => first.localeCompare(second, "pl"));
-
 const TIMELINE_PERIODS = [
   { label: "XIX wiek", range: "1800–1913", start: 1800, end: 1913 },
   { label: "I wojna światowa", range: "1914–1918", start: 1914, end: 1918 },
@@ -47,11 +41,11 @@ const TIMELINE_PERIODS = [
   { label: "Współczesność", range: "1992–2025", start: 1992, end: 2025 },
 ];
 
-const updateEventMarkers = (map, year, markerStore, filters = {}) => {
+const updateEventMarkers = (map, events, year, markerStore, filters = {}) => {
   markerStore.forEach((marker) => marker.remove());
   markerStore.length = 0;
 
-  const visibleEvents = EUROPEAN_EVENTS.filter((event) => (
+  const visibleEvents = events.filter((event) => (
     event.year === Number(year)
     && (!filters.country || event.country === filters.country)
     && (!filters.category || event.category === filters.category)
@@ -301,7 +295,7 @@ const modules = [
   ["SN", "Ścieżki nauki", "Poznawaj historię krok po kroku dzięki uporządkowanym materiałom."],
 ];
 
-function EventFilters({ countryFilter, categoryFilter, setCountryFilter, setCategoryFilter }) {
+function EventFilters({ countries, categories, countryFilter, categoryFilter, setCountryFilter, setCategoryFilter }) {
   const hasActiveFilters = Boolean(countryFilter || categoryFilter);
 
   return (
@@ -315,7 +309,7 @@ function EventFilters({ countryFilter, categoryFilter, setCountryFilter, setCate
         <span className="event-filter-select">
           <select value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
             <option value="">Wszystkie państwa</option>
-            {EVENT_COUNTRIES.map((country) => <option key={country} value={country}>{country}</option>)}
+            {countries.map((country) => <option key={country} value={country}>{country}</option>)}
           </select>
           <ChevronDown size={14} aria-hidden="true" />
         </span>
@@ -325,7 +319,7 @@ function EventFilters({ countryFilter, categoryFilter, setCountryFilter, setCate
         <span className="event-filter-select">
           <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
             <option value="">Wszystkie kategorie</option>
-            {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
           <ChevronDown size={14} aria-hidden="true" />
         </span>
@@ -345,7 +339,7 @@ function EventFilters({ countryFilter, categoryFilter, setCountryFilter, setCate
   );
 }
 
-function HistoryMap({ year, selectedMonth, countryFilter, categoryFilter }) {
+function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const styleReadyRef = useRef(false);
@@ -353,6 +347,7 @@ function HistoryMap({ year, selectedMonth, countryFilter, categoryFilter }) {
   const yearRef = useRef(year);
   const selectedMonthRef = useRef(selectedMonth);
   const filtersRef = useRef({ country: countryFilter, category: categoryFilter });
+  const eventsRef = useRef(events);
   const eventMarkersRef = useRef([]);
   const campaignMarkersRef = useRef([]);
   const [status, setStatus] = useState("loading");
@@ -360,6 +355,7 @@ function HistoryMap({ year, selectedMonth, countryFilter, categoryFilter }) {
   const [eventCount, setEventCount] = useState(0);
 
   useEffect(() => {
+    eventsRef.current = events;
     yearRef.current = year;
     selectedMonthRef.current = selectedMonth;
     filtersRef.current = { country: countryFilter, category: categoryFilter };
@@ -370,10 +366,10 @@ function HistoryMap({ year, selectedMonth, countryFilter, categoryFilter }) {
       map.triggerRepaint();
     }
     if (map) {
-      setEventCount(updateEventMarkers(map, year, eventMarkersRef.current, filtersRef.current));
+      setEventCount(updateEventMarkers(map, events, year, eventMarkersRef.current, filtersRef.current));
     }
     if (map) updateCampaignArrowheads(map, selectedMonth, campaignMarkersRef.current);
-  }, [year, selectedMonth, countryFilter, categoryFilter]);
+  }, [events, year, selectedMonth, countryFilter, categoryFilter]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
@@ -396,7 +392,7 @@ function HistoryMap({ year, selectedMonth, countryFilter, categoryFilter }) {
     });
 
     mapRef.current = map;
-    setEventCount(updateEventMarkers(map, yearRef.current, eventMarkersRef.current, filtersRef.current));
+    setEventCount(updateEventMarkers(map, eventsRef.current, yearRef.current, eventMarkersRef.current, filtersRef.current));
     updateCampaignArrowheads(map, selectedMonthRef.current, campaignMarkersRef.current);
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.once("style.load", () => {
@@ -587,10 +583,33 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
 }
 
 function App() {
+  const [events, setEvents] = useState([]);
+  const [eventsError, setEventsError] = useState("");
   const [year, setYear] = useState(START_YEAR);
   const [ww2Month, setWw2Month] = useState("1939-09");
   const [countryFilter, setCountryFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const europeanEvents = useMemo(() => events.filter(isEventInEurope), [events]);
+  const eventCountries = useMemo(() => [...new Set(europeanEvents.map((event) => event.country).filter(Boolean))]
+    .sort((first, second) => first.localeCompare(second, "pl")), [europeanEvents]);
+  const eventCategories = useMemo(() => [...new Set(europeanEvents.map((event) => event.category).filter(Boolean))]
+    .sort((first, second) => first.localeCompare(second, "pl")), [europeanEvents]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchEvents({ signal: controller.signal })
+      .then((loadedEvents) => {
+        setEvents(loadedEvents);
+        setEventsError("");
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          console.error(error);
+          setEventsError("Nie udało się wczytać wydarzeń z bazy danych.");
+        }
+      });
+    return () => controller.abort();
+  }, []);
   const scrollToMap = () => document.querySelector("#mapa")?.scrollIntoView({ behavior: "smooth" });
   const selectYear = (nextYear) => {
     setYear(nextYear);
@@ -648,12 +667,15 @@ function App() {
             <p>Mapa korzysta bezpośrednio z otwartych danych OpenHistoricalMap. Możesz ją przesuwać, przybliżać i filtrować według roku, państwa oraz kategorii.</p>
           </div>
           <EventFilters
+            countries={eventCountries}
+            categories={eventCategories}
             countryFilter={countryFilter}
             categoryFilter={categoryFilter}
             setCountryFilter={setCountryFilter}
             setCategoryFilter={setCategoryFilter}
           />
-          <HistoryMap year={year} selectedMonth={selectedMonth} countryFilter={countryFilter} categoryFilter={categoryFilter} />
+          {eventsError && <p className="events-error" role="alert">{eventsError}</p>}
+          <HistoryMap events={europeanEvents} year={year} selectedMonth={selectedMonth} countryFilter={countryFilter} categoryFilter={categoryFilter} />
           <Timeline year={year} setYear={selectYear} selectedMonth={selectedMonth} setSelectedMonth={selectWw2Month} />
         </section>
 

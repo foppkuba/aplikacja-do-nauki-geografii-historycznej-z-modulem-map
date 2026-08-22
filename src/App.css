@@ -118,6 +118,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .event-filters__reset:not(:disabled):hover { background: #d2e6de; }
 .event-filters__reset:disabled { cursor: default; opacity: .42; }
+.events-error { margin: -10px 0 14px; color: #8e2635; font-size: 12px; font-weight: 700; }
 .map-shell {
   position: relative; height: 570px; overflow: hidden; background: #dce9df;
   border: 8px solid white; border-radius: 20px; box-shadow: 0 24px 55px rgba(34,70,61,.14);

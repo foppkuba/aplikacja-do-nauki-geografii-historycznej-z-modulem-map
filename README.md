@@ -11,13 +11,24 @@ Wymagania: zainstalowane środowisko [Node.js](https://nodejs.org/) wraz z npm.
    npm install
    ```
 
-3. Uruchom serwer deweloperski:
+3. Utwórz bazę PostgreSQL z PostGIS i zastosuj schemat:
 
    ```bash
+   psql -d chronomap -f database/schema.sql
+   ```
+
+4. Skopiuj `.env.example` do `.env` i uzupełnij `DATABASE_URL`. Wydarzenia są
+   przechowywane wyłącznie w tabeli `historical_events` i nie mają kopii w plikach
+   źródłowych aplikacji.
+
+5. W dwóch terminalach uruchom API i frontend:
+
+   ```bash
+   npm run dev:api
    npm run dev
    ```
 
-4. Otwórz w przeglądarce adres wyświetlony w terminalu, domyślnie:
+6. Otwórz w przeglądarce adres wyświetlony w terminalu, domyślnie:
 
    http://localhost:5173/
 
