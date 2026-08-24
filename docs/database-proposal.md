@@ -1,105 +1,235 @@
-# Propozycja bazy danych Chronomap
+# Baza danych Chronomap
 
-## Rekomendacja
+## Sposób działania
 
-PostgreSQL z rozszerzeniem PostGIS. PostgreSQL przechowa dane aplikacyjne i konta,
-a PostGIS pozwoli zapisywać punkty wydarzeń oraz trasy kampanii jako prawdziwe dane
-geograficzne. Backend powinien udostępniać frontendowi API; przeglądarka nie powinna
-łączyć się bezpośrednio z bazą przy użyciu uprzywilejowanego konta.
-
-Na start wystarczy jeden serwer aplikacji i jedna baza. Nie ma potrzeby tworzenia
-osobnej bazy tylko dla logowania.
-
-## Zakres MVP
+Aplikacja korzysta z PostgreSQL. Frontend wysyła żądanie do serwera Express, a
+serwer odczytuje dane z bazy i zwraca je jako JSON.
 
 ```text
-users 1---n sessions
-  |
-  +---n user_event_progress n---1 historical_events n---1 event_categories
-                                     |
-                                     +---n event_sources
-                                     +---n campaign_routes
+Frontend React -> API Express -> PostgreSQL
 ```
 
-- `users` — konta i role (`user`, `editor`, `admin`),
-- `sessions` — sesje logowania; w bazie znajduje się wyłącznie skrót tokenu,
-- `historical_events` — wydarzenia, zakres dat, opis i punkt na mapie,
-- `event_categories` — np. Wojna, Polityka, Gospodarka,
-- `event_sources` — bibliografia i linki potwierdzające dane,
-- `campaign_routes` — linie ofensyw/kampanii widoczne na mapie,
-- `user_event_progress` — ulubione, obejrzane i ukończone wydarzenia.
+Kod tworzący tabele znajduje się w
+[`database/schema.sql`](../database/schema.sql).
 
-Gotowy schemat znajduje się w `database/schema.sql`.
+## Diagram
 
-## Logowanie i hasła
+```mermaid
+erDiagram
+    USERS ||--o{ SESSIONS : "ma"
+    USERS ||--o{ USER_EVENT_PROGRESS : "zapisuje"
+    EVENT_CATEGORIES ||--o{ HISTORICAL_EVENTS : "określa kategorię"
+    HISTORICAL_EVENTS ||--o{ EVENT_SOURCES : "ma źródła"
+    HISTORICAL_EVENTS ||--o{ CAMPAIGN_ROUTES : "ma trasy"
+    HISTORICAL_EVENTS ||--o{ USER_EVENT_PROGRESS : "ma postęp"
 
-Hasło nigdy nie może być zapisane jako zwykły tekst ani szyfrowane w sposób
-odwracalny. Backend powinien tworzyć hash Argon2id (z indywidualną solą; biblioteka
-zapisuje parametry i sól w wynikowym ciągu) i umieszczać go w `users.password_hash`.
+    USERS {
+        bigint id PK
+        varchar email UK
+        text password_hash
+        varchar display_name
+    }
 
-Proponowany przepływ:
+    SESSIONS {
+        bigint id PK
+        bigint user_id FK
+        text token_hash UK
+        timestamptz expires_at
+    }
 
-1. rejestracja: normalizacja e-maila, walidacja hasła, utworzenie hasha Argon2id;
-2. logowanie: porównanie hasła przez bibliotekę Argon2, bez ręcznego porównywania;
-3. po sukcesie: krótko żyjący token dostępu oraz losowy token odświeżający;
-4. w `sessions` zapisujemy SHA-256 tokenu odświeżającego, nie sam token;
-5. wylogowanie lub zmiana hasła unieważnia sesję (`revoked_at`);
-6. endpointy edytorskie sprawdzają rolę po stronie backendu.
+    EVENT_CATEGORIES {
+        smallint id PK
+        varchar name UK
+        char color
+    }
 
-Reset hasła i weryfikację e-maila można dodać jako tabelę jednorazowych tokenów,
-również przechowując wyłącznie ich hashe. Alternatywnie uwierzytelnianie może być
-obsługiwane przez zewnętrznego dostawcę; wtedy `password_hash` pozostaje puste,
-a konto identyfikuje para `auth_provider` + `auth_provider_subject`.
+    HISTORICAL_EVENTS {
+        bigint id PK
+        varchar title
+        text description
+        smallint category_id FK
+        date event_date
+        varchar place
+        varchar country
+        double longitude
+        double latitude
+    }
 
-## Model wydarzenia
+    EVENT_SOURCES {
+        bigint id PK
+        bigint event_id FK
+        text title
+        text url
+    }
 
-Pola DTO zwracanego przez API mapują się następująco:
+    CAMPAIGN_ROUTES {
+        bigint id PK
+        bigint event_id FK
+        varchar title
+        jsonb path
+    }
 
-| Obecne pole | Kolumna w bazie |
-|---|---|
-| `id` | `legacy_id` (tymczasowo podczas migracji) |
-| `title` | `title` |
-| `description` | `description` |
-| `date` | `display_date` |
-| `year` | wyliczany z `start_date` |
-| `place` | `place_name` |
-| `country` | `country_name` |
-| `category` | `category_id` |
-| `type` | `event_type` |
-| `coordinates: [lng, lat]` | `location geography(Point, 4326)` |
+    USER_EVENT_PROGRESS {
+        bigint user_id PK,FK
+        bigint event_id PK,FK
+        boolean is_favorite
+        boolean is_completed
+    }
+```
 
-`start_date` i `end_date` pozwalają opisać zarówno pojedynczy dzień, jak i bitwę
-trwającą kilka miesięcy. `date_precision` obsługuje wydarzenia, dla których znamy
-tylko rok lub miesiąc. `display_date` zachowuje poprawny podpis po polsku.
+## Znaczenie oznaczeń
 
-Status publikacji (`draft`, `published`, `archived`) umożliwia późniejsze dodanie
-panelu redakcyjnego bez pokazywania użytkownikom niedokończonych wpisów. Pole
-`version` pomoże zapobiegać przypadkowemu nadpisaniu równoległych zmian.
+- `PK` — identyfikator rekordu;
+- `FK` — odwołanie do rekordu w innej tabeli;
+- `UK` — wartość, która nie może się powtarzać.
 
-## API proponowane na pierwszy etap
+## Tabele
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
-- `GET /api/events?from=1939-01-01&to=1939-12-31&category=wojna`
-- `GET /api/events/:slug`
-- `POST/PATCH /api/events` — tylko `editor` lub `admin`
-- `PUT /api/me/events/:id/progress`
+### `users`
 
-Zapytanie listujące wydarzenia powinno przyjmować zakres dat i opcjonalny obszar
-mapy (`bbox`). Indeksy w schemacie obsługują oba rodzaje filtrowania.
+Podstawowe dane konta użytkownika:
 
-## Kolejność wdrożenia
+- `id` — numer użytkownika;
+- `email` — adres używany podczas logowania;
+- `password_hash` — bezpieczny skrót hasła;
+- `display_name` — nazwa wyświetlana w aplikacji.
 
-1. Uruchomić PostgreSQL/PostGIS i zastosować `database/schema.sql`.
-2. Dodać backend (np. Node.js + Fastify/Express) i konfigurację przez zmienne
-   środowiskowe; sekretów nie umieszczać w repozytorium.
-3. Zaimplementować rejestrację, logowanie, odświeżanie i wylogowanie.
-4. Przechowywać wydarzenia wyłącznie w `historical_events`; dodawać i zmieniać je
-   przez SQL lub endpointy edytorskie API.
-5. Wczytywać wydarzenia przez API, zachowując format DTO wymagany przez komponent mapy.
-6. Dodać panel redaktora i postęp użytkownika.
+### `sessions`
 
-Quizy i lekcje warto dodać w drugiej migracji, gdy ich format w interfejsie będzie
-już ustalony. Dzięki temu pierwszy schemat nie narzuci przedwcześnie złego modelu.
+Informacja o zalogowaniu użytkownika:
+
+- `id` — numer sesji;
+- `user_id` — użytkownik, do którego należy sesja;
+- `token_hash` — skrót tokenu logowania;
+- `expires_at` — czas wygaśnięcia sesji.
+
+### `event_categories`
+
+Kategorie używane do grupowania i filtrowania wydarzeń:
+
+- `id` — numer kategorii;
+- `name` — nazwa, np. `Wojna`;
+- `color` — kolor kategorii na mapie.
+
+### `historical_events`
+
+Dane wydarzenia wyświetlanego na mapie:
+
+- `id` — numer wydarzenia;
+- `title` — tytuł;
+- `description` — opis;
+- `category_id` — kategoria;
+- `event_date` — data;
+- `place` — nazwa miejsca;
+- `country` — państwo;
+- `longitude` — długość geograficzna;
+- `latitude` — szerokość geograficzna.
+
+Rok jest wyliczany z `event_date`, dlatego nie ma osobnej kolumny `year`.
+`place` jest podpisem dla użytkownika, a `longitude` i `latitude` wskazują dokładne
+miejsce znacznika na mapie.
+
+### `event_sources`
+
+Źródła potwierdzające informacje o wydarzeniu:
+
+- `id` — numer źródła;
+- `event_id` — wydarzenie;
+- `title` — nazwa książki, artykułu lub strony;
+- `url` — opcjonalny adres internetowy.
+
+### `campaign_routes`
+
+Trasy powiązane z wydarzeniem:
+
+- `id` — numer trasy;
+- `event_id` — powiązane wydarzenie;
+- `title` — nazwa trasy;
+- `path` — lista współrzędnych zapisana jako JSON.
+
+Przykład pola `path`:
+
+```json
+[[21.01, 52.23], [19.94, 50.06]]
+```
+
+### `user_event_progress`
+
+Postęp użytkownika dla wybranego wydarzenia:
+
+- `user_id` — użytkownik;
+- `event_id` — wydarzenie;
+- `is_favorite` — informacja, czy wydarzenie jest ulubione;
+- `is_completed` — informacja, czy materiał został ukończony.
+
+## Ładowanie wydarzeń
+
+Frontend wywołuje endpoint:
+
+```http
+GET /api/events
+```
+
+API pobiera rekordy z `historical_events`, dołącza nazwę kategorii i zwraca dane
+w formacie wymaganym przez mapę:
+
+```json
+{
+  "events": [
+    {
+      "id": 1,
+      "year": 1410,
+      "date": "1410-07-15",
+      "title": "Bitwa pod Grunwaldem",
+      "description": "Opis wydarzenia",
+      "place": "Grunwald",
+      "country": "Polska",
+      "category": "Wojna",
+      "type": "wydarzenie",
+      "coordinates": [20.1333, 53.4833]
+    }
+  ]
+}
+```
+
+Dostępne filtry:
+
+```http
+GET /api/events?from=1939-01-01
+GET /api/events?to=1945-12-31
+GET /api/events?category=Wojna
+```
+
+Endpoint `GET /api/health` sprawdza połączenie z bazą przez zapytanie `SELECT 1`.
+
+## Usuwanie danych
+
+- usunięcie użytkownika usuwa jego sesje i postęp;
+- usunięcie wydarzenia usuwa jego źródła i postęp;
+- usunięcie kategorii pozostawia wydarzenie bez kategorii;
+- usunięcie wydarzenia pozostawia trasę bez przypisania.
+
+## Uruchomienie
+
+Po utworzeniu bazy `chronomap` schemat można wykonać poleceniem:
+
+```bash
+psql -d chronomap -f database/schema.sql
+```
+
+Konfiguracja backendu w pliku `.env`:
+
+```dotenv
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/chronomap
+DATABASE_SSL=false
+PORT=3000
+```
+
+Schemat dodaje trzy początkowe kategorie: `Wojna`, `Polityka` i `Gospodarka`.
+Nie dodaje wydarzeń — rekordy `historical_events` trzeba wprowadzić osobno.
+
+## Stan aplikacji
+
+API odczytuje obecnie wydarzenia i sprawdza połączenie z bazą. Tabele użytkowników,
+sesji, źródeł, tras i postępu są przygotowane, ale nie mają jeszcze własnych
+endpointów API.

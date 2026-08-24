@@ -7,38 +7,37 @@ const port = Number(process.env.PORT || 3000);
 app.get("/api/events", async (request, response, next) => {
   try {
     const values = [];
-    const conditions = ["event.status = 'published'", "event.location IS NOT NULL"];
+    const conditions = [];
 
     if (request.query.from) {
       values.push(request.query.from);
-      conditions.push(`COALESCE(event.end_date, event.start_date) >= $${values.length}::date`);
+      conditions.push(`event.event_date >= $${values.length}::date`);
     }
     if (request.query.to) {
       values.push(request.query.to);
-      conditions.push(`event.start_date <= $${values.length}::date`);
+      conditions.push(`event.event_date <= $${values.length}::date`);
     }
     if (request.query.category) {
       values.push(request.query.category);
-      conditions.push(`category.slug = $${values.length}`);
+      conditions.push(`LOWER(category.name) = LOWER($${values.length})`);
     }
 
     const result = await pool.query(`
       SELECT
         event.id,
-        event.legacy_id AS "legacyId",
-        EXTRACT(YEAR FROM event.start_date)::integer AS year,
-        event.display_date AS date,
+        EXTRACT(YEAR FROM event.event_date)::integer AS year,
+        event.event_date AS date,
         event.title,
-        event.place_name AS place,
-        event.country_name AS country,
+        event.place,
+        event.country,
         category.name AS category,
-        CASE WHEN event.event_type = 'battle' THEN 'bitwa' ELSE 'wydarzenie' END AS type,
+        'wydarzenie' AS type,
         event.description,
-        ARRAY[ST_X(event.location::geometry), ST_Y(event.location::geometry)] AS coordinates
+        ARRAY[event.longitude, event.latitude] AS coordinates
       FROM historical_events event
       LEFT JOIN event_categories category ON category.id = event.category_id
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY event.start_date, event.title
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY event.event_date, event.title
     `, values);
 
     response.json({ events: result.rows });
