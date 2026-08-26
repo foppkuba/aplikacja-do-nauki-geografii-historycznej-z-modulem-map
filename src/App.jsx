@@ -8,6 +8,7 @@ import {
 import "./App.css";
 import { fetchEvents } from "./api/events";
 import { getActiveCampaignRoutes, getCampaignArrowheads } from "./ww2Campaigns";
+import { getClippedWw2TerritorialControl } from "./ww2TerritorialControl";
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
@@ -93,6 +94,103 @@ const updateEventMarkers = (map, events, year, markerStore, filters = {}) => {
 };
 
 const campaignColors = { axis: "#c94836", ussr: "#8e2635", allies: "#24649a" };
+const COUNTRY_COLORS = ["#d7a56d", "#75a58d", "#7899bd", "#c78678", "#9b8ab7", "#b6a65d"];
+const COUNTRY_COLOR_GROUPS = [
+  ["Polska", "Poland", "Portugal", "Portugalia", "Norway", "Norwegia", "Greece", "Grecja", "Ireland", "Irlandia"],
+  ["Germany", "Niemcy", "German Reich", "Deutsches Reich", "Spain", "Hiszpania", "Finland", "Finlandia", "Bulgaria", "Bułgaria"],
+  ["France", "Francja", "Sweden", "Szwecja", "Romania", "Rumunia", "Netherlands", "Niderlandy", "Holandia"],
+  ["Italy", "Włochy", "United Kingdom", "Wielka Brytania", "Hungary", "Węgry", "Belgium", "Belgia"],
+  ["Soviet Union", "USSR", "ZSRR", "Russia", "Rosja", "Yugoslavia", "Jugosławia", "Denmark", "Dania"],
+  ["Czechoslovakia", "Czechosłowacja", "Austria", "Switzerland", "Szwajcaria", "Albania", "Turkey", "Turcja"],
+];
+const AXIS_COUNTRIES = [
+  "Germany", "Niemcy", "German Reich", "Deutsches Reich", "Italy", "Włochy",
+  "Hungary", "Węgry", "Slovakia", "Słowacja", "Independent State of Croatia", "Chorwacja",
+];
+const ALLIED_COUNTRIES = [
+  "Poland", "Polska", "United Kingdom", "Wielka Brytania", "France", "Francja",
+  "Belgium", "Belgia", "Netherlands", "Niderlandy", "Holandia", "Norway", "Norwegia",
+  "Greece", "Grecja", "Yugoslavia", "Jugosławia", "Czechoslovakia", "Czechosłowacja",
+];
+
+const countryNameExpression = [
+  "coalesce",
+  ["get", "SUBJECTO"], ["get", "NAME_EN"], ["get", "ADMIN"], ["get", "NAME"], ["get", "name:en"],
+  ["get", "name_en"], ["get", "name"], ["get", "name:pl"],
+];
+
+const getCountryPolygonUrl = (selectedMonth) => {
+  if (!selectedMonth) return "/data/countries.geojson";
+  return selectedMonth >= "1945-05" ? "/data/world-1945.geojson" : "/data/world-1938.geojson";
+};
+
+const getCountryFillExpression = (selectedMonth) => {
+  if (!selectedMonth) {
+    return [
+      "match", countryNameExpression,
+      ...COUNTRY_COLOR_GROUPS.flatMap((countries, index) => [countries, COUNTRY_COLORS[index]]),
+      "#c8b98f",
+    ];
+  }
+
+  const axis = [...AXIS_COUNTRIES];
+  const allies = [...ALLIED_COUNTRIES];
+  if (selectedMonth < "1943-09") axis.push("Romania", "Rumunia", "Bulgaria", "Bułgaria");
+  else allies.push("Italy", "Włochy");
+  if (selectedMonth >= "1941-06") allies.push("Soviet Union", "USSR", "ZSRR", "Russia", "Rosja");
+  if (selectedMonth >= "1941-06" && selectedMonth < "1944-09") axis.push("Finland", "Finlandia");
+  if (selectedMonth >= "1944-08") allies.push("Romania", "Rumunia");
+  if (selectedMonth >= "1944-09") allies.push("Bulgaria", "Bułgaria");
+  allies.push("USA", "United States of America", "United States");
+
+  return ["match", countryNameExpression, axis, "#c94836", allies, "#24649a", "#b9b7a8"];
+};
+
+const updateCountryColors = (map, selectedMonth) => {
+  if (!map.getLayer("chronomap-country-fill")) return;
+  map.getSource("country-polygons")?.setData(getCountryPolygonUrl(selectedMonth));
+  map.setPaintProperty("chronomap-country-fill", "fill-color", getCountryFillExpression(selectedMonth));
+  map.setPaintProperty("chronomap-country-fill", "fill-opacity", selectedMonth ? 0.34 : 0.25);
+};
+
+const addWw2TerritorialControlLayers = (map, selectedMonth) => {
+  if (map.getSource("ww2-territorial-control")) return;
+  map.addSource("ww2-territorial-control", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+  map.addLayer({
+    id: "ww2-axis-controlled-area",
+    type: "fill",
+    source: "ww2-territorial-control",
+    filter: ["==", ["get", "kind"], "axis-control"],
+    paint: { "fill-color": "#c94836", "fill-opacity": 0.42 },
+  }, firstSymbolLayer);
+  map.addLayer({
+    id: "ww2-eastern-front",
+    type: "line",
+    source: "ww2-territorial-control",
+    filter: ["==", ["get", "kind"], "front-line"],
+    paint: {
+      "line-color": "#7d211e",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 2, 7, 4],
+      "line-opacity": 0.9,
+    },
+  }, firstSymbolLayer);
+  updateWw2TerritorialControl(map, selectedMonth);
+};
+
+let territorialControlRevision = 0;
+const updateWw2TerritorialControl = (map, selectedMonth) => {
+  const revision = ++territorialControlRevision;
+  getClippedWw2TerritorialControl(selectedMonth)
+    .then((data) => {
+      if (revision !== territorialControlRevision) return;
+      map.getSource("ww2-territorial-control")?.setData(data);
+    })
+    .catch((error) => console.warn("Nie udało się zaktualizować kontroli terytorium:", error));
+};
 
 const addWw2CampaignLayers = (map, selectedMonth) => {
   if (map.getSource("ww2-campaigns")) return;
@@ -193,7 +291,7 @@ const applyOhmDateFilter = (map, year, selectedMonth, baseFilters) => {
   });
 };
 
-const addVisibleCountryBoundaries = (map) => {
+const addVisibleCountryBoundaries = (map, selectedMonth) => {
   const countryFilter = [
     "<=",
     ["to-number", ["get", "admin_level"], 99],
@@ -207,6 +305,13 @@ const addVisibleCountryBoundaries = (map) => {
     5, 2.1,
     8, 3.4,
   ];
+  const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+
+  map.addSource("country-polygons", {
+    type: "geojson",
+    data: getCountryPolygonUrl(selectedMonth),
+    attribution: "Historical polygons: historical-basemaps (GPL-3.0)",
+  });
 
   map.addSource("ohmAdmin", {
     type: "vector",
@@ -217,14 +322,12 @@ const addVisibleCountryBoundaries = (map) => {
   map.addLayer({
     id: "chronomap-country-fill",
     type: "fill",
-    source: "ohmAdmin",
-    "source-layer": "boundaries",
-    filter: countryFilter,
+    source: "country-polygons",
     paint: {
-      "fill-color": "#d88a63",
-      "fill-opacity": 0.1,
+      "fill-color": getCountryFillExpression(selectedMonth),
+      "fill-opacity": selectedMonth ? 0.34 : 0.25,
     },
-  });
+  }, firstSymbolLayer);
 
   map.addLayer({
     id: "chronomap-country-boundary-casing",
@@ -244,7 +347,7 @@ const addVisibleCountryBoundaries = (map) => {
       ],
       "line-opacity": 0.92,
     },
-  });
+  }, firstSymbolLayer);
 
   map.addLayer({
     id: "chronomap-country-boundary",
@@ -257,7 +360,7 @@ const addVisibleCountryBoundaries = (map) => {
       "line-width": widthByZoom,
       "line-opacity": 0.95,
     },
-  });
+  }, firstSymbolLayer);
 };
 
 const localizeCountryLabels = (map) => {
@@ -362,6 +465,8 @@ function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter
     const map = mapRef.current;
     if (map && styleReadyRef.current) {
       applyOhmDateFilter(map, year, selectedMonth, baseFiltersRef.current);
+      updateCountryColors(map, selectedMonth);
+      updateWw2TerritorialControl(map, selectedMonth);
       updateWw2CampaignData(map, selectedMonth);
       map.triggerRepaint();
     }
@@ -400,7 +505,8 @@ function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter
       styleReadyRef.current = true;
       window.clearTimeout(loadTimeout);
       try {
-        addVisibleCountryBoundaries(map);
+        addVisibleCountryBoundaries(map, selectedMonthRef.current);
+        addWw2TerritorialControlLayers(map, selectedMonthRef.current);
         localizeCountryLabels(map);
         addWw2CampaignLayers(map, selectedMonthRef.current);
         applyOhmDateFilter(map, yearRef.current, selectedMonthRef.current, baseFilters);
@@ -480,10 +586,16 @@ function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter
       {selectedMonth && (
         <div className="campaign-legend" aria-label="Legenda działań II wojny światowej">
           <strong>II wojna światowa</strong>
-          <span><i className="legend-line legend-line--axis" />Państwa Osi</span>
-          <span><i className="legend-line legend-line--ussr" />Armia Czerwona</span>
-          <span><i className="legend-line legend-line--allies" />Alianci</span>
-          <small>Kierunki działań w wybranym miesiącu</small>
+          <span><i className="legend-swatch legend-swatch--axis" />Państwa Osi</span>
+          <span><i className="legend-swatch legend-swatch--allies" />Alianci</span>
+          <span><i className="legend-swatch legend-swatch--neutral" />Neutralne / pozostałe</span>
+          {selectedMonth >= "1941-06" && selectedMonth <= "1945-04" && (
+            <span><i className="legend-front" />Schematyczna linia frontu</span>
+          )}
+          <small>
+            Kolor pokazuje kontrolę terytorium w Europie i zmienia się wraz z kampaniami;
+            pozostałe granice wypełnień: przekrój {selectedMonth >= "1945-05" ? "1945" : "1938"}.
+          </small>
         </div>
       )}
       <div className="map-controls" aria-label="Sterowanie mapą">

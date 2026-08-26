@@ -236,6 +236,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .legend-line { width: 24px; height: 3px; background: #c94836; border-radius: 3px; }
 .legend-line--ussr { background: #8e2635; }
 .legend-line--allies { background: #24649a; }
+.legend-swatch {
+  width: 24px; height: 10px; border: 1px solid rgba(39, 48, 45, .35); border-radius: 2px;
+  background: #b9b7a8;
+}
+.legend-swatch--axis { background: #c94836; }
+.legend-swatch--allies { background: #24649a; }
+.legend-swatch--neutral { background: #b9b7a8; }
+.legend-front { width: 24px; height: 0; border-top: 2px solid #7d211e; }
 
 .timeline-card {
   position: relative; z-index: 3; max-width: 930px; margin: -34px auto 0;

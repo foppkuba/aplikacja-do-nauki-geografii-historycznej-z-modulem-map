@@ -11,11 +11,11 @@ app.get("/api/events", async (request, response, next) => {
 
     if (request.query.from) {
       values.push(request.query.from);
-      conditions.push(`event.event_date >= $${values.length}::date`);
+      conditions.push(`event.start_date >= $${values.length}::date`);
     }
     if (request.query.to) {
       values.push(request.query.to);
-      conditions.push(`event.event_date <= $${values.length}::date`);
+      conditions.push(`event.start_date <= $${values.length}::date`);
     }
     if (request.query.category) {
       values.push(request.query.category);
@@ -25,19 +25,23 @@ app.get("/api/events", async (request, response, next) => {
     const result = await pool.query(`
       SELECT
         event.id,
-        EXTRACT(YEAR FROM event.event_date)::integer AS year,
-        event.event_date AS date,
+        EXTRACT(YEAR FROM event.start_date)::integer AS year,
+        event.start_date AS date,
         event.title,
-        event.place,
-        event.country,
+        event.place_name AS place,
+        event.country_name AS country,
         category.name AS category,
-        'wydarzenie' AS type,
+        CASE WHEN event.event_type = 'battle' THEN 'bitwa' ELSE 'wydarzenie' END AS type,
         event.description,
-        ARRAY[event.longitude, event.latitude] AS coordinates
+        ARRAY[
+          ST_X(event.location::geometry),
+          ST_Y(event.location::geometry)
+        ] AS coordinates
       FROM historical_events event
       LEFT JOIN event_categories category ON category.id = event.category_id
-      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
-      ORDER BY event.event_date, event.title
+      WHERE event.location IS NOT NULL
+        ${conditions.length ? `AND ${conditions.join(" AND ")}` : ""}
+      ORDER BY event.start_date, event.title
     `, values);
 
     response.json({ events: result.rows });
