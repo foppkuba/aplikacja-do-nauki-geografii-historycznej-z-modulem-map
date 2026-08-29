@@ -206,15 +206,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
   font-size: 7px; font-weight: 900; letter-spacing: .25px;
 }
 .event-popup__tag--category { color: #9a4e2b; background: #fae9de; }
-.events-badge {
-  position: absolute; z-index: 2; left: 15px; bottom: 15px; display: flex; align-items: center; gap: 6px;
-  padding: 7px 10px; color: #667873; background: rgba(255,255,255,.92); border: 1px solid rgba(24,79,69,.12);
-  border-radius: 8px; box-shadow: 0 4px 12px rgba(29,62,53,.12); font-size: 9px; font-weight: 700;
-}
-.events-badge span {
-  display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px;
-  color: white; background: var(--orange); border-radius: 10px; font-size: 9px;
-}
 .campaign-arrow {
   width: 0; height: 0; padding: 0; background: transparent; border: 0;
   border-top: 8px solid transparent; border-bottom: 8px solid transparent;

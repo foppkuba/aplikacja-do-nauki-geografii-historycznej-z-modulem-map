@@ -11,11 +11,11 @@ app.get("/api/events", async (request, response, next) => {
 
     if (request.query.from) {
       values.push(request.query.from);
-      conditions.push(`event.start_date >= $${values.length}::date`);
+      conditions.push(`event.event_date >= $${values.length}::date`);
     }
     if (request.query.to) {
       values.push(request.query.to);
-      conditions.push(`event.start_date <= $${values.length}::date`);
+      conditions.push(`event.event_date <= $${values.length}::date`);
     }
     if (request.query.category) {
       values.push(request.query.category);
@@ -25,28 +25,47 @@ app.get("/api/events", async (request, response, next) => {
     const result = await pool.query(`
       SELECT
         event.id,
-        EXTRACT(YEAR FROM event.start_date)::integer AS year,
-        event.start_date AS date,
+        EXTRACT(YEAR FROM event.event_date)::integer AS year,
+        TO_CHAR(event.event_date, 'YYYY-MM-DD') AS date,
         event.title,
-        event.place_name AS place,
-        event.country_name AS country,
+        event.place,
+        event.country,
         category.name AS category,
-        CASE WHEN event.event_type = 'battle' THEN 'bitwa' ELSE 'wydarzenie' END AS type,
+        CASE WHEN LOWER(event.title) LIKE 'bitwa%' THEN 'bitwa' ELSE 'wydarzenie' END AS type,
         event.description,
-        ARRAY[
-          ST_X(event.location::geometry),
-          ST_Y(event.location::geometry)
-        ] AS coordinates
+        ARRAY[event.longitude, event.latitude] AS coordinates
       FROM historical_events event
       LEFT JOIN event_categories category ON category.id = event.category_id
-      WHERE event.location IS NOT NULL
+      WHERE event.longitude IS NOT NULL
+        AND event.latitude IS NOT NULL
         ${conditions.length ? `AND ${conditions.join(" AND ")}` : ""}
-      ORDER BY event.start_date, event.title
+      ORDER BY event.event_date, event.title
     `, values);
 
     response.json({ events: result.rows });
   } catch (error) {
     next(error);
+  }
+});
+
+app.get("/api/countries", async (request, response, next) => {
+  try {
+    const year = Number(request.query.year);
+    if (!Number.isInteger(year) || year < 1800 || year > 2025) {
+      return response.status(400).json({ error: "Parametr year musi być rokiem z zakresu 1800–2025." });
+    }
+
+    const result = await pool.query(`
+      SELECT name, valid_from AS "validFrom", valid_to AS "validTo",
+             longitude, latitude, zoom
+      FROM country_periods
+      WHERE $1 BETWEEN valid_from AND valid_to
+      ORDER BY name
+    `, [year]);
+
+    return response.json({ countries: result.rows });
+  } catch (error) {
+    return next(error);
   }
 });
 

@@ -6,13 +6,15 @@ import {
   RotateCcw, Search, Sparkles,
 } from "lucide-react";
 import "./App.css";
-import { fetchEvents } from "./api/events";
+import { fetchCountries, fetchEvents } from "./api/events";
 import { getActiveCampaignRoutes, getCampaignArrowheads } from "./ww2Campaigns";
 import { getClippedWw2TerritorialControl } from "./ww2TerritorialControl";
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
 const START_YEAR = 1939;
+const WW1_START_MONTH = 1914 * 12 + 6;
+const WW1_END_MONTH = 1918 * 12 + 10;
 const WW2_START_MONTH = 1939 * 12 + 8;
 const WW2_END_MONTH = 1945 * 12 + 4;
 const POLISH_MONTHS = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
@@ -33,6 +35,39 @@ const isEventInEurope = ({ coordinates: [longitude, latitude] }) => (
   && latitude >= EUROPE_BOUNDS[0][1]
   && latitude <= EUROPE_BOUNDS[1][1]
 );
+
+const focusMapOnCountry = (map, events, country, countryDetails) => {
+  if (!country) {
+    map.fitBounds(EUROPE_BOUNDS, { padding: 36, duration: 700 });
+    return;
+  }
+
+  const coordinates = events
+    .filter((event) => event.country === country)
+    .map((event) => event.coordinates)
+    .filter(([longitude, latitude]) => Number.isFinite(longitude) && Number.isFinite(latitude));
+
+  if (coordinates.length === 0) {
+    if (countryDetails) {
+      map.easeTo({
+        center: [Number(countryDetails.longitude), Number(countryDetails.latitude)],
+        zoom: Number(countryDetails.zoom),
+        duration: 700,
+      });
+    }
+    return;
+  }
+  if (coordinates.length === 1) {
+    map.easeTo({ center: coordinates[0], zoom: 5.5, duration: 700 });
+    return;
+  }
+
+  const bounds = coordinates.reduce(
+    (countryBounds, coordinate) => countryBounds.extend(coordinate),
+    new maplibregl.LngLatBounds(coordinates[0], coordinates[0]),
+  );
+  map.fitBounds(bounds, { padding: 90, maxZoom: 5.5, duration: 700 });
+};
 const TIMELINE_PERIODS = [
   { label: "XIX wiek", range: "1800–1913", start: 1800, end: 1913 },
   { label: "I wojna światowa", range: "1914–1918", start: 1914, end: 1918 },
@@ -42,12 +77,12 @@ const TIMELINE_PERIODS = [
   { label: "Współczesność", range: "1992–2025", start: 1992, end: 2025 },
 ];
 
-const updateEventMarkers = (map, events, year, markerStore, filters = {}) => {
+const updateEventMarkers = (map, events, year, selectedMonth, markerStore, filters = {}) => {
   markerStore.forEach((marker) => marker.remove());
   markerStore.length = 0;
 
   const visibleEvents = events.filter((event) => (
-    event.year === Number(year)
+    (selectedMonth ? event.date.startsWith(selectedMonth) : event.year === Number(year))
     && (!filters.country || event.country === filters.country)
     && (!filters.category || event.category === filters.category)
   ));
@@ -442,7 +477,8 @@ function EventFilters({ countries, categories, countryFilter, categoryFilter, se
   );
 }
 
-function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter }) {
+function HistoryMap({ events, countries, year, selectedMonth, countryFilter, categoryFilter }) {
+  const selectedWw2Month = selectedMonth && selectedMonth >= "1939-09" ? selectedMonth : null;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const styleReadyRef = useRef(false);
@@ -455,7 +491,12 @@ function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter
   const campaignMarkersRef = useRef([]);
   const [status, setStatus] = useState("loading");
   const [ohmStatus, setOhmStatus] = useState("connecting");
-  const [eventCount, setEventCount] = useState(0);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const countryDetails = countries.find((country) => country.name === countryFilter);
+    if (map) focusMapOnCountry(map, events, countryFilter, countryDetails);
+  }, [countryFilter, countries, events]);
 
   useEffect(() => {
     eventsRef.current = events;
@@ -464,17 +505,17 @@ function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter
     filtersRef.current = { country: countryFilter, category: categoryFilter };
     const map = mapRef.current;
     if (map && styleReadyRef.current) {
-      applyOhmDateFilter(map, year, selectedMonth, baseFiltersRef.current);
-      updateCountryColors(map, selectedMonth);
-      updateWw2TerritorialControl(map, selectedMonth);
-      updateWw2CampaignData(map, selectedMonth);
+      applyOhmDateFilter(map, year, selectedWw2Month, baseFiltersRef.current);
+      updateCountryColors(map, selectedWw2Month);
+      updateWw2TerritorialControl(map, selectedWw2Month);
+      updateWw2CampaignData(map, selectedWw2Month);
       map.triggerRepaint();
     }
     if (map) {
-      setEventCount(updateEventMarkers(map, events, year, eventMarkersRef.current, filtersRef.current));
+      updateEventMarkers(map, events, year, selectedMonth, eventMarkersRef.current, filtersRef.current);
     }
-    if (map) updateCampaignArrowheads(map, selectedMonth, campaignMarkersRef.current);
-  }, [events, year, selectedMonth, countryFilter, categoryFilter]);
+    if (map) updateCampaignArrowheads(map, selectedWw2Month, campaignMarkersRef.current);
+  }, [events, year, selectedMonth, selectedWw2Month, countryFilter, categoryFilter]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
@@ -497,7 +538,17 @@ function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter
     });
 
     mapRef.current = map;
-    setEventCount(updateEventMarkers(map, eventsRef.current, yearRef.current, eventMarkersRef.current, filtersRef.current));
+    if (filtersRef.current.country) {
+      focusMapOnCountry(map, eventsRef.current, filtersRef.current.country);
+    }
+    updateEventMarkers(
+      map,
+      eventsRef.current,
+      yearRef.current,
+      selectedMonthRef.current,
+      eventMarkersRef.current,
+      filtersRef.current,
+    );
     updateCampaignArrowheads(map, selectedMonthRef.current, campaignMarkersRef.current);
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.once("style.load", () => {
@@ -505,11 +556,14 @@ function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter
       styleReadyRef.current = true;
       window.clearTimeout(loadTimeout);
       try {
-        addVisibleCountryBoundaries(map, selectedMonthRef.current);
-        addWw2TerritorialControlLayers(map, selectedMonthRef.current);
+        const initialWw2Month = selectedMonthRef.current && selectedMonthRef.current >= "1939-09"
+          ? selectedMonthRef.current
+          : null;
+        addVisibleCountryBoundaries(map, initialWw2Month);
+        addWw2TerritorialControlLayers(map, initialWw2Month);
         localizeCountryLabels(map);
-        addWw2CampaignLayers(map, selectedMonthRef.current);
-        applyOhmDateFilter(map, yearRef.current, selectedMonthRef.current, baseFilters);
+        addWw2CampaignLayers(map, initialWw2Month);
+        applyOhmDateFilter(map, yearRef.current, initialWw2Month, baseFilters);
         map.triggerRepaint();
       } catch (error) {
         console.warn("Nie udało się zastosować filtra daty OHM:", error);
@@ -575,26 +629,18 @@ function HistoryMap({ events, year, selectedMonth, countryFilter, categoryFilter
         {ohmStatus === "connecting" && "Łączenie z OpenHistoricalMap…"}
         {ohmStatus === "error" && "Problem z połączeniem OHM"}
       </div>
-      <div className="events-badge" aria-live="polite">
-        <span>{eventCount}</span>
-        {eventCount === 1
-          ? "wydarzenie w tym roku"
-          : eventCount >= 2 && eventCount <= 4
-            ? "wydarzenia w tym roku"
-            : "wydarzeń w tym roku"}
-      </div>
-      {selectedMonth && (
+      {selectedWw2Month && (
         <div className="campaign-legend" aria-label="Legenda działań II wojny światowej">
           <strong>II wojna światowa</strong>
           <span><i className="legend-swatch legend-swatch--axis" />Państwa Osi</span>
           <span><i className="legend-swatch legend-swatch--allies" />Alianci</span>
           <span><i className="legend-swatch legend-swatch--neutral" />Neutralne / pozostałe</span>
-          {selectedMonth >= "1941-06" && selectedMonth <= "1945-04" && (
+          {selectedWw2Month >= "1941-06" && selectedWw2Month <= "1945-04" && (
             <span><i className="legend-front" />Schematyczna linia frontu</span>
           )}
           <small>
             Kolor pokazuje kontrolę terytorium w Europie i zmienia się wraz z kampaniami;
-            pozostałe granice wypełnień: przekrój {selectedMonth >= "1945-05" ? "1945" : "1938"}.
+            pozostałe granice wypełnień: przekrój {selectedWw2Month >= "1945-05" ? "1945" : "1938"}.
           </small>
         </div>
       )}
@@ -616,8 +662,11 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
   const progress = ((year - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * 100;
   const quickYears = [1800, 1850, 1900, 1939, 1945, 2000, 2025];
   const activePeriod = TIMELINE_PERIODS.find((period) => year >= period.start && year <= period.end);
-  const isWw2 = Boolean(selectedMonth);
-  const selectedMonthIndex = isWw2 ? monthIndexFromKey(selectedMonth) : WW2_START_MONTH;
+  const isWar = Boolean(selectedMonth);
+  const isWw2 = selectedMonth >= "1939-09";
+  const warStartMonth = isWw2 ? WW2_START_MONTH : WW1_START_MONTH;
+  const warEndMonth = isWw2 ? WW2_END_MONTH : WW1_END_MONTH;
+  const selectedMonthIndex = isWar ? monthIndexFromKey(selectedMonth) : warStartMonth;
   const selectedMonthNumber = selectedMonthIndex % 12;
 
   return (
@@ -625,7 +674,7 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
       <div className="timeline-heading">
         <div>
           <span className="section-kicker">PODRÓŻ W CZASIE</span>
-          <h2 id="timeline-title">Odkrywaj świat w wybranym {isWw2 ? "miesiącu" : "roku"}</h2>
+          <h2 id="timeline-title">Odkrywaj świat w wybranym {isWar ? "miesiącu" : "roku"}</h2>
         </div>
         <label className="year-field">
           <span>ROK</span>
@@ -646,22 +695,26 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
           aria-label="Wybierz rok mapy historycznej"
         />
       </div>
-      {isWw2 && (
+      {isWar && (
         <div className="ww2-month-timeline">
           <div className="ww2-month-timeline__heading">
             <strong>{POLISH_MONTHS[selectedMonthNumber]} {year}</strong>
-            <span>II wojna światowa · dokładność miesięczna</span>
+            <span>{isWw2 ? "II" : "I"} wojna światowa · dokładność miesięczna</span>
           </div>
           <input
             className="ww2-month-range"
             type="range"
-            min={WW2_START_MONTH}
-            max={WW2_END_MONTH}
+            min={warStartMonth}
+            max={warEndMonth}
             value={selectedMonthIndex}
             onChange={(event) => setSelectedMonth(monthKeyFromIndex(Number(event.target.value)))}
-            aria-label="Wybierz miesiąc II wojny światowej"
+            aria-label={`Wybierz miesiąc ${isWw2 ? "II" : "I"} wojny światowej`}
           />
-          <div className="ww2-month-timeline__scale"><span>IX 1939</span><span>1941</span><span>1943</span><span>V 1945</span></div>
+          <div className="ww2-month-timeline__scale">
+            {isWw2
+              ? <><span>IX 1939</span><span>1941</span><span>1943</span><span>V 1945</span></>
+              : <><span>VII 1914</span><span>1916</span><span>1917</span><span>XI 1918</span></>}
+          </div>
         </div>
       )}
       <div className="timeline-periods" aria-label="Okresy historyczne">
@@ -696,44 +749,88 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
 
 function App() {
   const [events, setEvents] = useState([]);
+  const [countries, setCountries] = useState([]);
   const [eventsError, setEventsError] = useState("");
+  const [countriesError, setCountriesError] = useState("");
+  const [countriesRequestAttempt, setCountriesRequestAttempt] = useState(0);
   const [year, setYear] = useState(START_YEAR);
+  const [ww1Month, setWw1Month] = useState("1914-07");
   const [ww2Month, setWw2Month] = useState("1939-09");
   const [countryFilter, setCountryFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const europeanEvents = useMemo(() => events.filter(isEventInEurope), [events]);
-  const eventCountries = useMemo(() => [...new Set(europeanEvents.map((event) => event.country).filter(Boolean))]
-    .sort((first, second) => first.localeCompare(second, "pl")), [europeanEvents]);
   const eventCategories = useMemo(() => [...new Set(europeanEvents.map((event) => event.category).filter(Boolean))]
     .sort((first, second) => first.localeCompare(second, "pl")), [europeanEvents]);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchEvents({ signal: controller.signal })
-      .then((loadedEvents) => {
-        setEvents(loadedEvents);
-        setEventsError("");
+    const loadEvents = () => {
+      fetchEvents({ signal: controller.signal })
+        .then((loadedEvents) => {
+          setEvents(loadedEvents);
+          setEventsError("");
+        })
+        .catch((error) => {
+          if (error.name !== "AbortError") {
+            console.error(error);
+            setEventsError("Nie udało się wczytać wydarzeń z bazy danych.");
+          }
+        });
+    };
+    loadEvents();
+    window.addEventListener("focus", loadEvents);
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", loadEvents);
+    };
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    let retryTimeout;
+    fetchCountries(year, { signal: controller.signal })
+      .then((loadedCountries) => {
+        setCountries(loadedCountries);
+        setCountriesError("");
+        setCountryFilter((selectedCountry) => (
+          selectedCountry && !loadedCountries.some((country) => country.name === selectedCountry)
+            ? ""
+            : selectedCountry
+        ));
       })
       .catch((error) => {
         if (error.name !== "AbortError") {
           console.error(error);
-          setEventsError("Nie udało się wczytać wydarzeń z bazy danych.");
+          setCountriesError("Nie udało się wczytać państw. Ponawiam połączenie z bazą…");
+          retryTimeout = window.setTimeout(
+            () => setCountriesRequestAttempt((attempt) => attempt + 1),
+            1500,
+          );
         }
       });
-    return () => controller.abort();
-  }, []);
+    return () => {
+      controller.abort();
+      window.clearTimeout(retryTimeout);
+    };
+  }, [year, countriesRequestAttempt]);
   const scrollToMap = () => document.querySelector("#mapa")?.scrollIntoView({ behavior: "smooth" });
   const selectYear = (nextYear) => {
     setYear(nextYear);
-    if (nextYear >= 1939 && nextYear <= 1945) {
+    if (nextYear >= 1914 && nextYear <= 1918) {
+      const currentMonth = Number(ww1Month.slice(5));
+      const month = nextYear === 1914 ? Math.max(7, currentMonth) : nextYear === 1918 ? Math.min(11, currentMonth) : currentMonth;
+      setWw1Month(`${nextYear}-${String(month).padStart(2, "0")}`);
+    } else if (nextYear >= 1939 && nextYear <= 1945) {
       const currentMonth = Number(ww2Month.slice(5));
       const month = nextYear === 1939 ? Math.max(9, currentMonth) : nextYear === 1945 ? Math.min(5, currentMonth) : currentMonth;
       setWw2Month(`${nextYear}-${String(month).padStart(2, "0")}`);
     }
   };
-  const selectedMonth = year >= 1939 && year <= 1945 ? ww2Month : null;
-  const selectWw2Month = (monthKey) => {
-    setWw2Month(monthKey);
+  const selectedMonth = year >= 1914 && year <= 1918
+    ? ww1Month
+    : year >= 1939 && year <= 1945 ? ww2Month : null;
+  const selectWarMonth = (monthKey) => {
+    if (monthKey < "1939-09") setWw1Month(monthKey);
+    else setWw2Month(monthKey);
     setYear(Number(monthKey.slice(0, 4)));
   };
 
@@ -779,7 +876,7 @@ function App() {
             <p>Mapa korzysta bezpośrednio z otwartych danych OpenHistoricalMap. Możesz ją przesuwać, przybliżać i filtrować według roku, państwa oraz kategorii.</p>
           </div>
           <EventFilters
-            countries={eventCountries}
+            countries={countries.map((country) => country.name)}
             categories={eventCategories}
             countryFilter={countryFilter}
             categoryFilter={categoryFilter}
@@ -787,8 +884,9 @@ function App() {
             setCategoryFilter={setCategoryFilter}
           />
           {eventsError && <p className="events-error" role="alert">{eventsError}</p>}
-          <HistoryMap events={europeanEvents} year={year} selectedMonth={selectedMonth} countryFilter={countryFilter} categoryFilter={categoryFilter} />
-          <Timeline year={year} setYear={selectYear} selectedMonth={selectedMonth} setSelectedMonth={selectWw2Month} />
+          {countriesError && <p className="events-error" role="status">{countriesError}</p>}
+          <HistoryMap events={europeanEvents} countries={countries} year={year} selectedMonth={selectedMonth} countryFilter={countryFilter} categoryFilter={categoryFilter} />
+          <Timeline year={year} setYear={selectYear} selectedMonth={selectedMonth} setSelectedMonth={selectWarMonth} />
         </section>
 
         <section className="how-it-works" id="odkrywaj">

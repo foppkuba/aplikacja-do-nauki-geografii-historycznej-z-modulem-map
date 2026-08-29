@@ -21,6 +21,20 @@ CREATE TABLE event_categories (
         CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$')
 );
 
+CREATE TABLE country_periods (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name varchar(120) NOT NULL,
+    valid_from smallint NOT NULL,
+    valid_to smallint NOT NULL,
+    longitude double precision NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+    latitude double precision NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+    zoom real NOT NULL DEFAULT 5 CHECK (zoom BETWEEN 2 AND 10),
+    CHECK (valid_from <= valid_to),
+    UNIQUE (name, valid_from, valid_to)
+);
+
+CREATE INDEX country_periods_years_idx ON country_periods (valid_from, valid_to);
+
 CREATE TABLE historical_events (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     title varchar(200) NOT NULL,
@@ -30,8 +44,12 @@ CREATE TABLE historical_events (
     place varchar(180) NOT NULL,
     country varchar(120) NOT NULL,
     longitude double precision NOT NULL CHECK (longitude BETWEEN -180 AND 180),
-    latitude double precision NOT NULL CHECK (latitude BETWEEN -90 AND 90)
+    latitude double precision NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+    external_id varchar(40)
 );
+
+CREATE UNIQUE INDEX historical_events_external_id_idx
+    ON historical_events (external_id) WHERE external_id IS NOT NULL;
 
 CREATE TABLE event_sources (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
