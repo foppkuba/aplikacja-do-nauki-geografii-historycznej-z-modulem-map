@@ -6,7 +6,8 @@ import {
   RotateCcw, Search, Sparkles,
 } from "lucide-react";
 import "./App.css";
-import { fetchCountries, fetchEvents } from "./api/events";
+import { fetchCountries, fetchEvents, fetchWarAlignments, fetchWarTerritorialKeyframes } from "./api/events";
+import { getWw1TerritorialControl } from "./ww1TerritorialControl";
 import { getActiveCampaignRoutes, getCampaignArrowheads } from "./ww2Campaigns";
 import { getClippedWw2TerritorialControl } from "./ww2TerritorialControl";
 
@@ -156,16 +157,29 @@ const countryNameExpression = [
 
 const getCountryPolygonUrl = (selectedMonth) => {
   if (!selectedMonth) return "/data/countries.geojson";
+  if (selectedMonth <= "1918-11") return "/data/world-1914.geojson";
   return selectedMonth >= "1945-05" ? "/data/world-1945.geojson" : "/data/world-1938.geojson";
 };
 
-const getCountryFillExpression = (selectedMonth) => {
+const getCountryFillExpression = (selectedMonth, ww1Alignments = []) => {
   if (!selectedMonth) {
     return [
       "match", countryNameExpression,
       ...COUNTRY_COLOR_GROUPS.flatMap((countries, index) => [countries, COUNTRY_COLORS[index]]),
       "#c8b98f",
     ];
+  }
+
+  if (selectedMonth <= "1918-11") {
+    const central = [...new Set(
+      ww1Alignments.filter(({ side }) => side === "central").flatMap(({ mapNames }) => mapNames),
+    )];
+    const centralNames = new Set(central);
+    const entente = [...new Set(
+      ww1Alignments.filter(({ side }) => side === "entente").flatMap(({ mapNames }) => mapNames),
+    )].filter((name) => !centralNames.has(name));
+    if (central.length === 0 || entente.length === 0) return "#b9b7a8";
+    return ["match", countryNameExpression, central, "#c94836", entente, "#24649a", "#b9b7a8"];
   }
 
   const axis = [...AXIS_COUNTRIES];
@@ -181,11 +195,47 @@ const getCountryFillExpression = (selectedMonth) => {
   return ["match", countryNameExpression, axis, "#c94836", allies, "#24649a", "#b9b7a8"];
 };
 
-const updateCountryColors = (map, selectedMonth) => {
+const updateCountryColors = (map, selectedMonth, ww1Alignments) => {
   if (!map.getLayer("chronomap-country-fill")) return;
+  const isWw1 = Boolean(selectedMonth && selectedMonth <= "1918-11");
   map.getSource("country-polygons")?.setData(getCountryPolygonUrl(selectedMonth));
-  map.setPaintProperty("chronomap-country-fill", "fill-color", getCountryFillExpression(selectedMonth));
-  map.setPaintProperty("chronomap-country-fill", "fill-opacity", selectedMonth ? 0.34 : 0.25);
+  map.setPaintProperty("chronomap-country-fill", "fill-color", getCountryFillExpression(selectedMonth, ww1Alignments));
+  map.setPaintProperty("chronomap-country-fill", "fill-opacity", isWw1 && !ww1Alignments.length ? 0 : selectedMonth ? 0.34 : 0.25);
+};
+
+let ww1ControlRevision = 0;
+const updateWw1TerritorialControl = (map, selectedMonth, keyframes) => {
+  const revision = ++ww1ControlRevision;
+  getWw1TerritorialControl(selectedMonth, keyframes).then((data) => {
+    if (revision === ww1ControlRevision) map.getSource("ww1-territorial-control")?.setData(data);
+  });
+};
+
+const addWw1TerritorialControlLayers = (map, selectedMonth, keyframes) => {
+  map.addSource("ww1-territorial-control", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
+  map.addLayer({
+    id: "ww1-central-controlled-area",
+    type: "fill",
+    source: "ww1-territorial-control",
+    filter: ["==", ["get", "kind"], "central-control"],
+    paint: { "fill-color": "#c94836", "fill-opacity": 0.5 },
+  }, firstSymbolLayer);
+  map.addLayer({
+    id: "ww1-eastern-front",
+    type: "line",
+    source: "ww1-territorial-control",
+    filter: ["==", ["get", "kind"], "front-line"],
+    paint: {
+      "line-color": "#7d211e",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 3, 2, 7, 4],
+      "line-opacity": 0.9,
+    },
+  }, firstSymbolLayer);
+  updateWw1TerritorialControl(map, selectedMonth, keyframes);
 };
 
 const addWw2TerritorialControlLayers = (map, selectedMonth) => {
@@ -326,20 +376,7 @@ const applyOhmDateFilter = (map, year, selectedMonth, baseFilters) => {
   });
 };
 
-const addVisibleCountryBoundaries = (map, selectedMonth) => {
-  const countryFilter = [
-    "<=",
-    ["to-number", ["get", "admin_level"], 99],
-    2,
-  ];
-  const widthByZoom = [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
-    2, 1.2,
-    5, 2.1,
-    8, 3.4,
-  ];
+const addVisibleCountryBoundaries = (map, selectedMonth, ww1Alignments) => {
   const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
 
   map.addSource("country-polygons", {
@@ -348,52 +385,13 @@ const addVisibleCountryBoundaries = (map, selectedMonth) => {
     attribution: "Historical polygons: historical-basemaps (GPL-3.0)",
   });
 
-  map.addSource("ohmAdmin", {
-    type: "vector",
-    url: "https://vtiles.openhistoricalmap.org/maps/ohm_admin.json",
-    attribution: "OpenHistoricalMap",
-  });
-
   map.addLayer({
     id: "chronomap-country-fill",
     type: "fill",
     source: "country-polygons",
     paint: {
-      "fill-color": getCountryFillExpression(selectedMonth),
-      "fill-opacity": selectedMonth ? 0.34 : 0.25,
-    },
-  }, firstSymbolLayer);
-
-  map.addLayer({
-    id: "chronomap-country-boundary-casing",
-    type: "line",
-    source: "ohmAdmin",
-    "source-layer": "boundaries",
-    filter: countryFilter,
-    paint: {
-      "line-color": "#fff9ed",
-      "line-width": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        2, 3.2,
-        5, 5,
-        8, 7,
-      ],
-      "line-opacity": 0.92,
-    },
-  }, firstSymbolLayer);
-
-  map.addLayer({
-    id: "chronomap-country-boundary",
-    type: "line",
-    source: "ohmAdmin",
-    "source-layer": "boundaries",
-    filter: countryFilter,
-    paint: {
-      "line-color": "#7c3029",
-      "line-width": widthByZoom,
-      "line-opacity": 0.95,
+      "fill-color": getCountryFillExpression(selectedMonth, ww1Alignments),
+      "fill-opacity": selectedMonth && selectedMonth <= "1918-11" && !ww1Alignments.length ? 0 : selectedMonth ? 0.34 : 0.25,
     },
   }, firstSymbolLayer);
 };
@@ -477,8 +475,9 @@ function EventFilters({ countries, categories, countryFilter, categoryFilter, se
   );
 }
 
-function HistoryMap({ events, countries, year, selectedMonth, countryFilter, categoryFilter }) {
+function HistoryMap({ events, countries, ww1Alignments, ww1TerritorialKeyframes, year, selectedMonth, countryFilter, categoryFilter }) {
   const selectedWw2Month = selectedMonth && selectedMonth >= "1939-09" ? selectedMonth : null;
+  const selectedWw1Month = selectedMonth && selectedMonth <= "1918-11" ? selectedMonth : null;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const styleReadyRef = useRef(false);
@@ -487,6 +486,8 @@ function HistoryMap({ events, countries, year, selectedMonth, countryFilter, cat
   const selectedMonthRef = useRef(selectedMonth);
   const filtersRef = useRef({ country: countryFilter, category: categoryFilter });
   const eventsRef = useRef(events);
+  const ww1AlignmentsRef = useRef(ww1Alignments);
+  const ww1TerritorialKeyframesRef = useRef(ww1TerritorialKeyframes);
   const eventMarkersRef = useRef([]);
   const campaignMarkersRef = useRef([]);
   const [status, setStatus] = useState("loading");
@@ -500,13 +501,16 @@ function HistoryMap({ events, countries, year, selectedMonth, countryFilter, cat
 
   useEffect(() => {
     eventsRef.current = events;
+    ww1AlignmentsRef.current = ww1Alignments;
+    ww1TerritorialKeyframesRef.current = ww1TerritorialKeyframes;
     yearRef.current = year;
     selectedMonthRef.current = selectedMonth;
     filtersRef.current = { country: countryFilter, category: categoryFilter };
     const map = mapRef.current;
     if (map && styleReadyRef.current) {
-      applyOhmDateFilter(map, year, selectedWw2Month, baseFiltersRef.current);
-      updateCountryColors(map, selectedWw2Month);
+      applyOhmDateFilter(map, year, selectedMonth, baseFiltersRef.current);
+      updateCountryColors(map, selectedMonth, ww1Alignments);
+      updateWw1TerritorialControl(map, selectedWw1Month, ww1TerritorialKeyframes);
       updateWw2TerritorialControl(map, selectedWw2Month);
       updateWw2CampaignData(map, selectedWw2Month);
       map.triggerRepaint();
@@ -515,7 +519,7 @@ function HistoryMap({ events, countries, year, selectedMonth, countryFilter, cat
       updateEventMarkers(map, events, year, selectedMonth, eventMarkersRef.current, filtersRef.current);
     }
     if (map) updateCampaignArrowheads(map, selectedWw2Month, campaignMarkersRef.current);
-  }, [events, year, selectedMonth, selectedWw2Month, countryFilter, categoryFilter]);
+  }, [events, ww1Alignments, ww1TerritorialKeyframes, year, selectedMonth, selectedWw1Month, selectedWw2Month, countryFilter, categoryFilter]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
@@ -559,7 +563,9 @@ function HistoryMap({ events, countries, year, selectedMonth, countryFilter, cat
         const initialWw2Month = selectedMonthRef.current && selectedMonthRef.current >= "1939-09"
           ? selectedMonthRef.current
           : null;
-        addVisibleCountryBoundaries(map, initialWw2Month);
+        const initialMonth = selectedMonthRef.current;
+        addVisibleCountryBoundaries(map, initialMonth, ww1AlignmentsRef.current);
+        addWw1TerritorialControlLayers(map, initialMonth && initialMonth <= "1918-11" ? initialMonth : null, ww1TerritorialKeyframesRef.current);
         addWw2TerritorialControlLayers(map, initialWw2Month);
         localizeCountryLabels(map);
         addWw2CampaignLayers(map, initialWw2Month);
@@ -640,8 +646,18 @@ function HistoryMap({ events, countries, year, selectedMonth, countryFilter, cat
           )}
           <small>
             Kolor pokazuje kontrolę terytorium w Europie i zmienia się wraz z kampaniami;
-            pozostałe granice wypełnień: przekrój {selectedWw2Month >= "1945-05" ? "1945" : "1938"}.
+            granice administracyjne pochodzą z historycznych wielokątów OpenHistoricalMap.
           </small>
+        </div>
+      )}
+      {selectedWw1Month && (
+        <div className="campaign-legend" aria-label="Legenda stron I wojny światowej">
+          <strong>I wojna światowa</strong>
+          <span><i className="legend-swatch legend-swatch--axis" />Państwa centralne</span>
+          <span><i className="legend-swatch legend-swatch--allies" />Ententa i alianci</span>
+          <span><i className="legend-swatch legend-swatch--neutral" />Neutralne / pozostałe</span>
+          <span><i className="legend-front" />Linia frontu i kontrola państw centralnych</span>
+          <small>Przynależność państw jest pobierana z bazy i zmienia się dla wybranego miesiąca.</small>
         </div>
       )}
       <div className="map-controls" aria-label="Sterowanie mapą">
@@ -752,6 +768,8 @@ function App() {
   const [countries, setCountries] = useState([]);
   const [eventsError, setEventsError] = useState("");
   const [countriesError, setCountriesError] = useState("");
+  const [ww1Alignments, setWw1Alignments] = useState([]);
+  const [ww1TerritorialKeyframes, setWw1TerritorialKeyframes] = useState([]);
   const [countriesRequestAttempt, setCountriesRequestAttempt] = useState(0);
   const [year, setYear] = useState(START_YEAR);
   const [ww1Month, setWw1Month] = useState("1914-07");
@@ -783,6 +801,15 @@ function App() {
       controller.abort();
       window.removeEventListener("focus", loadEvents);
     };
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchWarTerritorialKeyframes("ww1", { signal: controller.signal })
+      .then(setWw1TerritorialKeyframes)
+      .catch((error) => {
+        if (error.name !== "AbortError") console.error(error);
+      });
+    return () => controller.abort();
   }, []);
   useEffect(() => {
     const controller = new AbortController();
@@ -828,6 +855,18 @@ function App() {
   const selectedMonth = year >= 1914 && year <= 1918
     ? ww1Month
     : year >= 1939 && year <= 1945 ? ww2Month : null;
+  useEffect(() => {
+    if (!selectedMonth || selectedMonth > "1918-11") {
+      return undefined;
+    }
+    const controller = new AbortController();
+    fetchWarAlignments("ww1", selectedMonth, { signal: controller.signal })
+      .then(setWw1Alignments)
+      .catch((error) => {
+        if (error.name !== "AbortError") console.error(error);
+      });
+    return () => controller.abort();
+  }, [selectedMonth]);
   const selectWarMonth = (monthKey) => {
     if (monthKey < "1939-09") setWw1Month(monthKey);
     else setWw2Month(monthKey);
@@ -885,7 +924,7 @@ function App() {
           />
           {eventsError && <p className="events-error" role="alert">{eventsError}</p>}
           {countriesError && <p className="events-error" role="status">{countriesError}</p>}
-          <HistoryMap events={europeanEvents} countries={countries} year={year} selectedMonth={selectedMonth} countryFilter={countryFilter} categoryFilter={categoryFilter} />
+          <HistoryMap events={europeanEvents} countries={countries} ww1Alignments={ww1Alignments} ww1TerritorialKeyframes={ww1TerritorialKeyframes} year={year} selectedMonth={selectedMonth} countryFilter={countryFilter} categoryFilter={categoryFilter} />
           <Timeline year={year} setYear={selectYear} selectedMonth={selectedMonth} setSelectedMonth={selectWarMonth} />
         </section>
 

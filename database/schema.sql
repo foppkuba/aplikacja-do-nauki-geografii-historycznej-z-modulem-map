@@ -35,6 +35,31 @@ CREATE TABLE country_periods (
 
 CREATE INDEX country_periods_years_idx ON country_periods (valid_from, valid_to);
 
+CREATE TABLE war_country_alignments (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    war varchar(20) NOT NULL,
+    side varchar(20) NOT NULL CHECK (side IN ('central', 'entente')),
+    country varchar(120) NOT NULL,
+    map_names jsonb NOT NULL,
+    valid_from char(7) NOT NULL,
+    valid_to char(7) NOT NULL,
+    CHECK (valid_from <= valid_to),
+    UNIQUE (war, country, valid_from)
+);
+
+CREATE INDEX war_country_alignments_period_idx
+    ON war_country_alignments (war, valid_from, valid_to);
+
+CREATE TABLE war_territorial_keyframes (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    war varchar(20) NOT NULL,
+    month char(7) NOT NULL,
+    front_longitudes jsonb NOT NULL,
+    occupied_countries jsonb NOT NULL DEFAULT '[]'::jsonb,
+    note text,
+    UNIQUE (war, month)
+);
+
 CREATE TABLE historical_events (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     title varchar(200) NOT NULL,

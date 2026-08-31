@@ -15,3 +15,21 @@ export async function fetchCountries(year, { signal } = {}) {
   if (!Array.isArray(payload.countries)) throw new Error("API państw zwróciło nieprawidłowe dane.");
   return payload.countries;
 }
+
+export async function fetchWarAlignments(war, month, { signal } = {}) {
+  const params = new URLSearchParams({ war, month });
+  const response = await fetch(`/api/war-alignments?${params}`, { signal });
+  if (!response.ok) throw new Error(`API stron konfliktu zwróciło status ${response.status}.`);
+
+  const payload = await response.json();
+  if (!Array.isArray(payload.alignments)) throw new Error("API stron konfliktu zwróciło nieprawidłowe dane.");
+  return payload.alignments;
+}
+
+export async function fetchWarTerritorialKeyframes(war, { signal } = {}) {
+  const response = await fetch(`/api/war-territorial-keyframes?war=${encodeURIComponent(war)}`, { signal });
+  if (!response.ok) throw new Error(`API zmian terytorialnych zwróciło status ${response.status}.`);
+  const payload = await response.json();
+  if (!Array.isArray(payload.keyframes)) throw new Error("API zmian terytorialnych zwróciło nieprawidłowe dane.");
+  return payload.keyframes;
+}

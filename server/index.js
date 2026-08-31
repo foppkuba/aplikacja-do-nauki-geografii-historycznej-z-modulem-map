@@ -69,6 +69,44 @@ app.get("/api/countries", async (request, response, next) => {
   }
 });
 
+app.get("/api/war-alignments", async (request, response, next) => {
+  try {
+    const { war, month } = request.query;
+    if (war !== "ww1" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month ?? "")) {
+      return response.status(400).json({ error: "Nieprawidłowa wojna lub miesiąc." });
+    }
+
+    const result = await pool.query(`
+      SELECT side, country, map_names AS "mapNames", valid_from AS "validFrom", valid_to AS "validTo"
+      FROM war_country_alignments
+      WHERE war = $1 AND $2 BETWEEN valid_from AND valid_to
+      ORDER BY side, country
+    `, [war, month]);
+
+    return response.json({ alignments: result.rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get("/api/war-territorial-keyframes", async (request, response, next) => {
+  try {
+    if (request.query.war !== "ww1") {
+      return response.status(400).json({ error: "Nieprawidłowa wojna." });
+    }
+    const result = await pool.query(`
+      SELECT month, front_longitudes AS "frontLongitudes",
+             occupied_countries AS "occupiedCountries", note
+      FROM war_territorial_keyframes
+      WHERE war = $1
+      ORDER BY month
+    `, [request.query.war]);
+    return response.json({ keyframes: result.rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.get("/api/health", async (_request, response, next) => {
   try {
     await pool.query("SELECT 1");
