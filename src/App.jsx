@@ -3,17 +3,20 @@ import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   ArrowRight, Check, ChevronDown, Clock3, Filter, Maximize2, Minus, Plus,
-  RotateCcw, Search, Sparkles,
+  Pause, Play, RotateCcw, Search, Sparkles,
 } from "lucide-react";
 import "./App.css";
 import { fetchCountries, fetchEvents, fetchWarAlignments, fetchWarTerritorialKeyframes } from "./api/events";
 import { getWw1TerritorialControl } from "./ww1TerritorialControl";
 import { getActiveCampaignRoutes, getCampaignArrowheads } from "./ww2Campaigns";
 import { getClippedWw2TerritorialControl } from "./ww2TerritorialControl";
+import { getActiveNapoleonicRoutes, getNapoleonicArrowheads } from "./napoleonicCampaigns";
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
 const START_YEAR = 1939;
+const NAPOLEON_START_MONTH = 1803 * 12 + 4;
+const NAPOLEON_END_MONTH = 1815 * 12 + 5;
 const WW1_START_MONTH = 1914 * 12 + 6;
 const WW1_END_MONTH = 1918 * 12 + 10;
 const WW2_START_MONTH = 1939 * 12 + 8;
@@ -70,7 +73,8 @@ const focusMapOnCountry = (map, events, country, countryDetails) => {
   map.fitBounds(bounds, { padding: 90, maxZoom: 5.5, duration: 700 });
 };
 const TIMELINE_PERIODS = [
-  { label: "XIX wiek", range: "1800–1913", start: 1800, end: 1913 },
+  { label: "Epoka napoleońska", range: "1803–1815", start: 1803, end: 1815 },
+  { label: "XIX wiek", range: "1816–1913", start: 1816, end: 1913 },
   { label: "I wojna światowa", range: "1914–1918", start: 1914, end: 1918 },
   { label: "Dwudziestolecie", range: "1919–1938", start: 1919, end: 1938 },
   { label: "II wojna światowa", range: "1939–1945", start: 1939, end: 1945 },
@@ -129,7 +133,10 @@ const updateEventMarkers = (map, events, year, selectedMonth, markerStore, filte
   return visibleEvents.length;
 };
 
-const campaignColors = { axis: "#c94836", ussr: "#8e2635", allies: "#24649a" };
+const campaignColors = {
+  axis: "#c94836", ussr: "#8e2635", allies: "#24649a",
+  france: "#315f9a", coalition: "#c94836",
+};
 const COUNTRY_COLORS = ["#d7a56d", "#75a58d", "#7899bd", "#c78678", "#9b8ab7", "#b6a65d"];
 const COUNTRY_COLOR_GROUPS = [
   ["Polska", "Poland", "Portugal", "Portugalia", "Norway", "Norwegia", "Greece", "Grecja", "Ireland", "Irlandia"],
@@ -170,7 +177,34 @@ const getCountryFillExpression = (selectedMonth, ww1Alignments = []) => {
     ];
   }
 
-  if (selectedMonth <= "1918-11") {
+  if (selectedMonth <= "1815-06") {
+    const france = ["France", "Kingfom of Italy", "Italy", "Belgium"];
+    const coalition = ["United Kingdom of Great Britain and Ireland", "Portugal"];
+    if (selectedMonth <= "1808-04") france.push("Spain");
+    else coalition.push("Spain");
+    if (selectedMonth >= "1807-07" && selectedMonth <= "1814-01") {
+      france.push("Denmark", "Norway");
+    }
+    if (selectedMonth >= "1806-07" && selectedMonth <= "1813-02") {
+      france.push("German Empire", "Germany");
+    }
+    if (selectedMonth >= "1806-06" && selectedMonth <= "1813-11") france.push("Netherlands");
+    if (selectedMonth >= "1812-06" && selectedMonth <= "1812-12") {
+      france.push("Austro-Hungarian Empire", "Austria-Hungary", "Austria");
+    }
+    if ((selectedMonth >= "1805-08" && selectedMonth <= "1805-12")
+      || (selectedMonth >= "1809-04" && selectedMonth <= "1809-10")
+      || selectedMonth >= "1813-08") coalition.push("Austro-Hungarian Empire", "Austria-Hungary", "Austria");
+    if ((selectedMonth >= "1805-08" && selectedMonth <= "1807-07") || selectedMonth >= "1812-06") {
+      coalition.push("Russian Empire", "Russia");
+    }
+    if ((selectedMonth >= "1806-08" && selectedMonth <= "1807-07") || selectedMonth >= "1813-03") {
+      coalition.push("German Empire", "Germany", "Prussia");
+    }
+    return ["match", countryNameExpression, france, "#315f9a", coalition, "#c94836", "#b9b7a8"];
+  }
+
+  if (selectedMonth >= "1914-07" && selectedMonth <= "1918-11") {
     const central = [...new Set(
       ww1Alignments.filter(({ side }) => side === "central").flatMap(({ mapNames }) => mapNames),
     )];
@@ -197,7 +231,7 @@ const getCountryFillExpression = (selectedMonth, ww1Alignments = []) => {
 
 const updateCountryColors = (map, selectedMonth, ww1Alignments) => {
   if (!map.getLayer("chronomap-country-fill")) return;
-  const isWw1 = Boolean(selectedMonth && selectedMonth <= "1918-11");
+  const isWw1 = Boolean(selectedMonth && selectedMonth >= "1914-07" && selectedMonth <= "1918-11");
   map.getSource("country-polygons")?.setData(getCountryPolygonUrl(selectedMonth));
   map.setPaintProperty("chronomap-country-fill", "fill-color", getCountryFillExpression(selectedMonth, ww1Alignments));
   map.setPaintProperty("chronomap-country-fill", "fill-opacity", isWw1 && !ww1Alignments.length ? 0 : selectedMonth ? 0.34 : 0.25);
@@ -277,9 +311,21 @@ const updateWw2TerritorialControl = (map, selectedMonth) => {
     .catch((error) => console.warn("Nie udało się zaktualizować kontroli terytorium:", error));
 };
 
-const addWw2CampaignLayers = (map, selectedMonth) => {
+const getActiveWarCampaignRoutes = (selectedMonth) => (
+  selectedMonth && selectedMonth <= "1815-06"
+    ? getActiveNapoleonicRoutes(selectedMonth)
+    : getActiveCampaignRoutes(selectedMonth)
+);
+
+const getWarCampaignArrowheads = (selectedMonth) => (
+  selectedMonth && selectedMonth <= "1815-06"
+    ? getNapoleonicArrowheads(selectedMonth)
+    : getCampaignArrowheads(selectedMonth)
+);
+
+const addWarCampaignLayers = (map, selectedMonth) => {
   if (map.getSource("ww2-campaigns")) return;
-  map.addSource("ww2-campaigns", { type: "geojson", data: getActiveCampaignRoutes(selectedMonth) });
+  map.addSource("ww2-campaigns", { type: "geojson", data: getActiveWarCampaignRoutes(selectedMonth) });
   const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
 
   Object.entries(campaignColors).forEach(([side, color]) => {
@@ -299,9 +345,9 @@ const addWw2CampaignLayers = (map, selectedMonth) => {
   });
 };
 
-const updateWw2CampaignData = (map, selectedMonth) => {
+const updateWarCampaignData = (map, selectedMonth) => {
   const source = map.getSource("ww2-campaigns");
-  if (source) source.setData(getActiveCampaignRoutes(selectedMonth));
+  if (source) source.setData(getActiveWarCampaignRoutes(selectedMonth));
 };
 
 const updateCampaignArrowheads = (map, selectedMonth, markerStore) => {
@@ -309,10 +355,11 @@ const updateCampaignArrowheads = (map, selectedMonth, markerStore) => {
   markerStore.length = 0;
   if (!selectedMonth) return;
 
-  getCampaignArrowheads(selectedMonth).forEach((arrow) => {
+  getWarCampaignArrowheads(selectedMonth).forEach((arrow) => {
     const [lng, lat] = arrow.coordinates;
     const [previousLng, previousLat] = arrow.previousCoordinates;
-    const angle = Math.atan2(lat - previousLat, lng - previousLng) * (180 / Math.PI);
+    const longitudeScale = Math.cos(((lat + previousLat) / 2) * Math.PI / 180);
+    const angle = Math.atan2(lat - previousLat, (lng - previousLng) * longitudeScale) * (180 / Math.PI);
     const element = document.createElement("button");
     element.type = "button";
     element.className = `campaign-arrow campaign-arrow--${arrow.side}`;
@@ -391,7 +438,7 @@ const addVisibleCountryBoundaries = (map, selectedMonth, ww1Alignments) => {
     source: "country-polygons",
     paint: {
       "fill-color": getCountryFillExpression(selectedMonth, ww1Alignments),
-      "fill-opacity": selectedMonth && selectedMonth <= "1918-11" && !ww1Alignments.length ? 0 : selectedMonth ? 0.34 : 0.25,
+      "fill-opacity": selectedMonth && selectedMonth >= "1914-07" && selectedMonth <= "1918-11" && !ww1Alignments.length ? 0 : selectedMonth ? 0.34 : 0.25,
     },
   }, firstSymbolLayer);
 };
@@ -477,7 +524,9 @@ function EventFilters({ countries, categories, countryFilter, categoryFilter, se
 
 function HistoryMap({ events, countries, ww1Alignments, ww1TerritorialKeyframes, year, selectedMonth, countryFilter, categoryFilter }) {
   const selectedWw2Month = selectedMonth && selectedMonth >= "1939-09" ? selectedMonth : null;
-  const selectedWw1Month = selectedMonth && selectedMonth <= "1918-11" ? selectedMonth : null;
+  const selectedWw1Month = selectedMonth && selectedMonth >= "1914-07" && selectedMonth <= "1918-11" ? selectedMonth : null;
+  const selectedNapoleonicMonth = selectedMonth && selectedMonth <= "1815-06" ? selectedMonth : null;
+  const selectedCampaignMonth = selectedNapoleonicMonth || selectedWw2Month;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const styleReadyRef = useRef(false);
@@ -512,14 +561,14 @@ function HistoryMap({ events, countries, ww1Alignments, ww1TerritorialKeyframes,
       updateCountryColors(map, selectedMonth, ww1Alignments);
       updateWw1TerritorialControl(map, selectedWw1Month, ww1TerritorialKeyframes);
       updateWw2TerritorialControl(map, selectedWw2Month);
-      updateWw2CampaignData(map, selectedWw2Month);
+      updateWarCampaignData(map, selectedCampaignMonth);
       map.triggerRepaint();
     }
     if (map) {
       updateEventMarkers(map, events, year, selectedMonth, eventMarkersRef.current, filtersRef.current);
     }
-    if (map) updateCampaignArrowheads(map, selectedWw2Month, campaignMarkersRef.current);
-  }, [events, ww1Alignments, ww1TerritorialKeyframes, year, selectedMonth, selectedWw1Month, selectedWw2Month, countryFilter, categoryFilter]);
+    if (map) updateCampaignArrowheads(map, selectedCampaignMonth, campaignMarkersRef.current);
+  }, [events, ww1Alignments, ww1TerritorialKeyframes, year, selectedMonth, selectedNapoleonicMonth, selectedWw1Month, selectedWw2Month, selectedCampaignMonth, countryFilter, categoryFilter]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
@@ -553,7 +602,10 @@ function HistoryMap({ events, countries, ww1Alignments, ww1TerritorialKeyframes,
       eventMarkersRef.current,
       filtersRef.current,
     );
-    updateCampaignArrowheads(map, selectedMonthRef.current, campaignMarkersRef.current);
+    const initialCampaignMonth = selectedMonthRef.current && (selectedMonthRef.current <= "1815-06" || selectedMonthRef.current >= "1939-09")
+      ? selectedMonthRef.current
+      : null;
+    updateCampaignArrowheads(map, initialCampaignMonth, campaignMarkersRef.current);
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.once("style.load", () => {
       styleReady = true;
@@ -565,11 +617,11 @@ function HistoryMap({ events, countries, ww1Alignments, ww1TerritorialKeyframes,
           : null;
         const initialMonth = selectedMonthRef.current;
         addVisibleCountryBoundaries(map, initialMonth, ww1AlignmentsRef.current);
-        addWw1TerritorialControlLayers(map, initialMonth && initialMonth <= "1918-11" ? initialMonth : null, ww1TerritorialKeyframesRef.current);
+        addWw1TerritorialControlLayers(map, initialMonth && initialMonth >= "1914-07" && initialMonth <= "1918-11" ? initialMonth : null, ww1TerritorialKeyframesRef.current);
         addWw2TerritorialControlLayers(map, initialWw2Month);
         localizeCountryLabels(map);
-        addWw2CampaignLayers(map, initialWw2Month);
-        applyOhmDateFilter(map, yearRef.current, initialWw2Month, baseFilters);
+        addWarCampaignLayers(map, initialCampaignMonth);
+        applyOhmDateFilter(map, yearRef.current, initialMonth, baseFilters);
         map.triggerRepaint();
       } catch (error) {
         console.warn("Nie udało się zastosować filtra daty OHM:", error);
@@ -650,6 +702,15 @@ function HistoryMap({ events, countries, ww1Alignments, ww1TerritorialKeyframes,
           </small>
         </div>
       )}
+      {selectedNapoleonicMonth && (
+        <div className="campaign-legend" aria-label="Legenda wojen napoleońskich">
+          <strong>Wojny napoleońskie</strong>
+          <span><i className="legend-swatch legend-swatch--france" />Francja, sojusznicy i kierunek ataku</span>
+          <span><i className="legend-swatch legend-swatch--coalition" />Koalicja i kierunek kontrataku</span>
+          <span><i className="legend-swatch legend-swatch--neutral" />Neutralne / pozostałe</span>
+          <small>Sojusznicy Francji są oznaczeni tym samym niebieskim kolorem. Kierunki działań są schematyczne.</small>
+        </div>
+      )}
       {selectedWw1Month && (
         <div className="campaign-legend" aria-label="Legenda stron I wojny światowej">
           <strong>I wojna światowa</strong>
@@ -675,15 +736,55 @@ function HistoryMap({ events, countries, ww1Alignments, ww1TerritorialKeyframes,
 }
 
 function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
+  const [isPlaying, setIsPlaying] = useState(false);
   const progress = ((year - MIN_YEAR) / (MAX_YEAR - MIN_YEAR)) * 100;
-  const quickYears = [1800, 1850, 1900, 1939, 1945, 2000, 2025];
+  const quickYears = [1800, 1805, 1812, 1914, 1939, 1945, 2000, 2025];
   const activePeriod = TIMELINE_PERIODS.find((period) => year >= period.start && year <= period.end);
   const isWar = Boolean(selectedMonth);
-  const isWw2 = selectedMonth >= "1939-09";
-  const warStartMonth = isWw2 ? WW2_START_MONTH : WW1_START_MONTH;
-  const warEndMonth = isWw2 ? WW2_END_MONTH : WW1_END_MONTH;
+  const isNapoleonic = Boolean(selectedMonth && selectedMonth <= "1815-06");
+  const isWw2 = Boolean(selectedMonth && selectedMonth >= "1939-09");
+  const warStartMonth = isNapoleonic ? NAPOLEON_START_MONTH : isWw2 ? WW2_START_MONTH : WW1_START_MONTH;
+  const warEndMonth = isNapoleonic ? NAPOLEON_END_MONTH : isWw2 ? WW2_END_MONTH : WW1_END_MONTH;
   const selectedMonthIndex = isWar ? monthIndexFromKey(selectedMonth) : warStartMonth;
   const selectedMonthNumber = selectedMonthIndex % 12;
+
+  useEffect(() => {
+    if (!isPlaying) return undefined;
+
+    const timeout = window.setTimeout(() => {
+      if (selectedMonth) {
+        if (selectedMonthIndex < warEndMonth) {
+          const monthStep = isNapoleonic ? 4 : 1;
+          setSelectedMonth(monthKeyFromIndex(Math.min(selectedMonthIndex + monthStep, warEndMonth)));
+        } else if (year < MAX_YEAR) {
+          setYear(year + 1);
+        } else {
+          setIsPlaying(false);
+        }
+      } else if (year < MAX_YEAR) {
+        setYear(year + 1);
+      } else {
+        setIsPlaying(false);
+      }
+    }, 900);
+
+    return () => window.clearTimeout(timeout);
+  }, [isPlaying, isNapoleonic, selectedMonth, selectedMonthIndex, setSelectedMonth, setYear, warEndMonth, year]);
+
+  const stopAndSetYear = (nextYear) => {
+    setIsPlaying(false);
+    setYear(nextYear);
+  };
+
+  const stopAndSetMonth = (monthKey) => {
+    setIsPlaying(false);
+    setSelectedMonth(monthKey);
+  };
+
+  const togglePlayback = () => {
+    if (!isPlaying && year >= MAX_YEAR) setYear(MIN_YEAR);
+    setIsPlaying((playing) => !playing);
+  };
 
   return (
     <section className="timeline-card" aria-labelledby="timeline-title">
@@ -692,22 +793,34 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
           <span className="section-kicker">PODRÓŻ W CZASIE</span>
           <h2 id="timeline-title">Odkrywaj świat w wybranym {isWar ? "miesiącu" : "roku"}</h2>
         </div>
-        <label className="year-field">
+        <div className="timeline-heading__controls">
+          <button
+            className={`timeline-playback ${isPlaying ? "is-playing" : ""}`}
+            type="button"
+            onClick={togglePlayback}
+            aria-label={isPlaying ? "Zatrzymaj animację osi czasu" : "Uruchom animację osi czasu"}
+            aria-pressed={isPlaying}
+          >
+            {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+            <span>{isPlaying ? "Pauza" : "Start"}</span>
+          </button>
+          <label className="year-field">
           <span>ROK</span>
           <input
             type="number" min={MIN_YEAR} max={MAX_YEAR} value={year}
             onChange={(event) => {
               const value = Number(event.target.value);
-              if (value >= MIN_YEAR && value <= MAX_YEAR) setYear(value);
+              if (value >= MIN_YEAR && value <= MAX_YEAR) stopAndSetYear(value);
             }}
           />
-        </label>
+          </label>
+        </div>
       </div>
       <div className="range-wrap" style={{ "--progress": `${progress}%` }}>
         <div className="range-track" />
         <input
           className="year-range" type="range" min={MIN_YEAR} max={MAX_YEAR}
-          value={year} onChange={(event) => setYear(Number(event.target.value))}
+          value={year} onChange={(event) => stopAndSetYear(Number(event.target.value))}
           aria-label="Wybierz rok mapy historycznej"
         />
       </div>
@@ -715,19 +828,22 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
         <div className="ww2-month-timeline">
           <div className="ww2-month-timeline__heading">
             <strong>{POLISH_MONTHS[selectedMonthNumber]} {year}</strong>
-            <span>{isWw2 ? "II" : "I"} wojna światowa · dokładność miesięczna</span>
+            <span>{isNapoleonic ? "Wojny napoleońskie · krok co 4 miesiące" : `${isWw2 ? "II" : "I"} wojna światowa · dokładność miesięczna`}</span>
           </div>
           <input
             className="ww2-month-range"
             type="range"
             min={warStartMonth}
             max={warEndMonth}
+            step={isNapoleonic ? 4 : 1}
             value={selectedMonthIndex}
-            onChange={(event) => setSelectedMonth(monthKeyFromIndex(Number(event.target.value)))}
-            aria-label={`Wybierz miesiąc ${isWw2 ? "II" : "I"} wojny światowej`}
+            onChange={(event) => stopAndSetMonth(monthKeyFromIndex(Number(event.target.value)))}
+            aria-label={isNapoleonic ? "Wybierz miesiąc wojen napoleońskich" : `Wybierz miesiąc ${isWw2 ? "II" : "I"} wojny światowej`}
           />
           <div className="ww2-month-timeline__scale">
-            {isWw2
+            {isNapoleonic
+              ? <><span>V 1803</span><span>1805</span><span>1812</span><span>VI 1815</span></>
+              : isWw2
               ? <><span>IX 1939</span><span>1941</span><span>1943</span><span>V 1945</span></>
               : <><span>VII 1914</span><span>1916</span><span>1917</span><span>XI 1918</span></>}
           </div>
@@ -739,7 +855,7 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
             type="button"
             key={period.label}
             className={activePeriod?.label === period.label ? "active" : ""}
-            onClick={() => setYear(period.start)}
+            onClick={() => stopAndSetYear(period.start)}
             aria-pressed={activePeriod?.label === period.label}
           >
             <strong>{period.label}</strong>
@@ -749,7 +865,7 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
       </div>
       <div className="quick-years">
         {quickYears.map((item) => (
-          <button type="button" key={item} className={item === year ? "active" : ""} onClick={() => setYear(item)}>
+          <button type="button" key={item} className={item === year ? "active" : ""} onClick={() => stopAndSetYear(item)}>
             {item}
           </button>
         ))}
@@ -772,6 +888,7 @@ function App() {
   const [ww1TerritorialKeyframes, setWw1TerritorialKeyframes] = useState([]);
   const [countriesRequestAttempt, setCountriesRequestAttempt] = useState(0);
   const [year, setYear] = useState(START_YEAR);
+  const [napoleonicMonth, setNapoleonicMonth] = useState("1803-05");
   const [ww1Month, setWw1Month] = useState("1914-07");
   const [ww2Month, setWw2Month] = useState("1939-09");
   const [countryFilter, setCountryFilter] = useState("");
@@ -842,7 +959,11 @@ function App() {
   const scrollToMap = () => document.querySelector("#mapa")?.scrollIntoView({ behavior: "smooth" });
   const selectYear = (nextYear) => {
     setYear(nextYear);
-    if (nextYear >= 1914 && nextYear <= 1918) {
+    if (nextYear >= 1803 && nextYear <= 1815) {
+      const currentMonth = Number(napoleonicMonth.slice(5));
+      const month = nextYear === 1803 ? Math.max(5, currentMonth) : nextYear === 1815 ? Math.min(6, currentMonth) : currentMonth;
+      setNapoleonicMonth(`${nextYear}-${String(month).padStart(2, "0")}`);
+    } else if (nextYear >= 1914 && nextYear <= 1918) {
       const currentMonth = Number(ww1Month.slice(5));
       const month = nextYear === 1914 ? Math.max(7, currentMonth) : nextYear === 1918 ? Math.min(11, currentMonth) : currentMonth;
       setWw1Month(`${nextYear}-${String(month).padStart(2, "0")}`);
@@ -852,11 +973,12 @@ function App() {
       setWw2Month(`${nextYear}-${String(month).padStart(2, "0")}`);
     }
   };
-  const selectedMonth = year >= 1914 && year <= 1918
-    ? ww1Month
+  const selectedMonth = year >= 1803 && year <= 1815
+    ? napoleonicMonth
+    : year >= 1914 && year <= 1918 ? ww1Month
     : year >= 1939 && year <= 1945 ? ww2Month : null;
   useEffect(() => {
-    if (!selectedMonth || selectedMonth > "1918-11") {
+    if (!selectedMonth || selectedMonth < "1914-07" || selectedMonth > "1918-11") {
       return undefined;
     }
     const controller = new AbortController();
@@ -868,7 +990,8 @@ function App() {
     return () => controller.abort();
   }, [selectedMonth]);
   const selectWarMonth = (monthKey) => {
-    if (monthKey < "1939-09") setWw1Month(monthKey);
+    if (monthKey <= "1815-06") setNapoleonicMonth(monthKey);
+    else if (monthKey < "1939-09") setWw1Month(monthKey);
     else setWw2Month(monthKey);
     setYear(Number(monthKey.slice(0, 4)));
   };

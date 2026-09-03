@@ -215,15 +215,17 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .campaign-arrow--ussr { border-left-color: #8e2635; }
 .campaign-arrow--allies { border-left-color: #24649a; }
+.campaign-arrow--france { border-left-color: #315f9a; }
+.campaign-arrow--coalition { border-left-color: #c94836; }
 .campaign-popup .event-popup__category { color: #8e2635; }
 .campaign-legend {
   position: absolute; z-index: 2; right: 72px; top: 18px; display: flex; flex-direction: column; gap: 7px;
-  width: 168px; padding: 12px 13px; color: #526560; background: rgba(255,255,255,.94);
+  width: 210px; padding: 13px 14px; color: #526560; background: rgba(255,255,255,.96);
   border: 1px solid rgba(24,79,69,.12); border-radius: 9px; box-shadow: 0 6px 18px rgba(29,62,53,.14);
 }
 .campaign-legend strong { color: var(--ink); font: 700 13px Cambria, "Times New Roman", serif; }
-.campaign-legend span { display: flex; align-items: center; gap: 7px; font-size: 8px; font-weight: 700; }
-.campaign-legend small { padding-top: 4px; color: #81908c; border-top: 1px solid #e8ece9; font-size: 7px; }
+.campaign-legend span { display: flex; align-items: center; gap: 7px; font-size: 9px; font-weight: 700; line-height: 1.3; }
+.campaign-legend small { padding-top: 5px; color: #71827e; border-top: 1px solid #e8ece9; font-size: 8px; line-height: 1.35; }
 .legend-line { width: 24px; height: 3px; background: #c94836; border-radius: 3px; }
 .legend-line--ussr { background: #8e2635; }
 .legend-line--allies { background: #24649a; }
@@ -234,6 +236,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .legend-swatch--axis { background: #c94836; }
 .legend-swatch--allies { background: #24649a; }
 .legend-swatch--neutral { background: #b9b7a8; }
+.legend-swatch--france { background: #315f9a; }
+.legend-swatch--coalition { background: #c94836; }
 .legend-front { width: 24px; height: 0; border-top: 2px solid #7d211e; }
 
 .timeline-card {
@@ -244,6 +248,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .timeline-heading { display: flex; align-items: flex-end; justify-content: space-between; }
 .timeline-heading h2 { font-size: 23px; }
+.timeline-heading__controls { display: flex; align-items: flex-end; gap: 10px; }
+.timeline-playback {
+  height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 0 14px; color: white; background: var(--orange); border: 0;
+  border-radius: 9px; cursor: pointer; font-size: 10px; font-weight: 800;
+  box-shadow: 0 5px 12px rgba(175, 91, 48, .2); transition: transform .2s, background .2s;
+}
+.timeline-playback:hover { transform: translateY(-1px); }
+.timeline-playback.is-playing { background: var(--green); }
 .year-field { display: flex; flex-direction: column; gap: 3px; }
 .year-field span { color: #788a86; font-size: 7px; font-weight: 900; letter-spacing: 1px; }
 .year-field input {
@@ -273,7 +286,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .ww2-month-range { width: 100%; margin: 12px 0 3px; accent-color: var(--orange); cursor: pointer; }
 .ww2-month-timeline__scale { display: flex; justify-content: space-between; color: #82918d; font-size: 7px; font-weight: 800; }
 .timeline-periods {
-  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 7px 0 12px;
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 7px 0 12px;
 }
 .timeline-periods button {
   min-width: 0; padding: 9px 5px 8px; color: #647773; background: #f3f6f3;
@@ -365,9 +378,12 @@ footer > a { color: var(--green); font-size: 10px; font-weight: 800; text-align:
   .event-filter-field { min-width: 0; flex-basis: calc(50% - 5px); }
   .event-filters__reset { width: 100%; }
   .map-shell { height: 480px; border-width: 5px; }
-  .campaign-legend { right: 64px; top: 18px; width: 150px; }
+  .campaign-legend { right: 64px; top: 18px; width: 175px; }
   .timeline-card { margin-left: 8px; margin-right: 8px; padding: 22px 20px 18px; }
   .timeline-heading { align-items: flex-start; gap: 18px; }
+  .timeline-heading__controls { align-items: flex-end; }
+  .timeline-playback { width: 38px; padding: 0; }
+  .timeline-playback span { display: none; }
   .timeline-heading h2 { font-size: 19px; }
   .timeline-periods { grid-template-columns: repeat(2, 1fr); }
   .timeline-periods strong { font-size: 9px; }
