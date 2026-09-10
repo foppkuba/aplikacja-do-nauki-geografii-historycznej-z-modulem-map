@@ -98,6 +98,38 @@ CREATE TABLE user_event_progress (
     PRIMARY KEY (user_id, event_id)
 );
 
+CREATE TABLE quiz_categories (
+    id smallint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    slug varchar(60) NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9-]+$'),
+    name varchar(120) NOT NULL UNIQUE,
+    description text NOT NULL,
+    sort_order smallint NOT NULL DEFAULT 0
+);
+
+CREATE TABLE quiz_questions (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    category_id smallint NOT NULL REFERENCES quiz_categories(id) ON DELETE CASCADE,
+    prompt text NOT NULL,
+    explanation text NOT NULL,
+    sort_order smallint NOT NULL DEFAULT 0,
+    UNIQUE (category_id, prompt)
+);
+
+CREATE TABLE quiz_answers (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    question_id bigint NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
+    answer_text text NOT NULL,
+    is_correct boolean NOT NULL DEFAULT false,
+    sort_order smallint NOT NULL DEFAULT 0,
+    UNIQUE (question_id, answer_text)
+);
+
+CREATE UNIQUE INDEX quiz_answers_one_correct_idx
+    ON quiz_answers (question_id) WHERE is_correct;
+
+CREATE INDEX quiz_questions_category_idx
+    ON quiz_questions (category_id, sort_order);
+
 CREATE INDEX historical_events_date_idx
     ON historical_events (event_date);
 

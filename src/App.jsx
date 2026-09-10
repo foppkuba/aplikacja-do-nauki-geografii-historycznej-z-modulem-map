@@ -11,6 +11,7 @@ import { getWw1TerritorialControl } from "./ww1TerritorialControl";
 import { getActiveCampaignRoutes, getCampaignArrowheads } from "./ww2Campaigns";
 import { getClippedWw2TerritorialControl } from "./ww2TerritorialControl";
 import { getActiveNapoleonicRoutes, getNapoleonicArrowheads } from "./napoleonicCampaigns";
+import QuizModule from "./QuizModule";
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
@@ -473,7 +474,6 @@ const localizeCountryLabels = (map) => {
 };
 
 const modules = [
-  ["QZ", "Quizy historyczne", "Sprawdzaj wiedzę na podstawie wydarzeń i miejsc widocznych na mapie."],
   ["PR", "Twoje postępy", "Obserwuj wyniki, ukończone epoki i czas poświęcony na naukę."],
   ["SN", "Ścieżki nauki", "Poznawaj historię krok po kroku dzięki uporządkowanym materiałom."],
 ];
@@ -1006,7 +1006,7 @@ function App() {
         <nav aria-label="Główna nawigacja">
           <a className="active" href="#mapa">Mapa</a>
           <a href="#odkrywaj">Odkrywaj</a>
-          <a href="#moduly">Quizy <span>WKRÓTCE</span></a>
+          <a href="#quizy">Quizy</a>
           <a href="#moduly">Postępy <span>WKRÓTCE</span></a>
         </nav>
         <button className="ghost-button" type="button" onClick={scrollToMap}><Search size={17} /> Przejdź do mapy</button>
@@ -1063,6 +1063,8 @@ function App() {
             <article><span>03</span><div className="step-index">III</div><h3>Rozwijaj wiedzę</h3><p>W kolejnych etapach pojawią się wydarzenia, lekcje i quizy.</p></article>
           </div>
         </section>
+
+        <QuizModule />
 
         <section className="future-modules" id="moduly">
           <div className="section-intro">
