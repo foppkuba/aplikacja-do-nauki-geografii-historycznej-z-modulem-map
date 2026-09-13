@@ -1,0 +1,25 @@
+import "dotenv/config";
+import { readFile } from "node:fs/promises";
+import pg from "pg";
+
+if (!process.env.DATABASE_URL) throw new Error("Brak zmiennej środowiskowej DATABASE_URL.");
+
+const sql = await readFile(new URL("../database/auth.sql", import.meta.url), "utf8");
+const client = new pg.Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+});
+
+try {
+  await client.connect();
+  const tables = await client.query(`
+    SELECT to_regclass('public.sessions') AS legacy, to_regclass('public.user_sessions') AS current
+  `);
+  if (tables.rows[0].legacy && !tables.rows[0].current) {
+    await client.query("ALTER TABLE sessions RENAME TO user_sessions");
+  }
+  await client.query(sql);
+  console.log("Tabele użytkowników i sesji zostały zapisane w bazie.");
+} finally {
+  await client.end();
+}
