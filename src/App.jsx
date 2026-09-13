@@ -12,6 +12,7 @@ import { getActiveCampaignRoutes, getCampaignArrowheads } from "./ww2Campaigns";
 import { getClippedWw2TerritorialControl } from "./ww2TerritorialControl";
 import { getActiveNapoleonicRoutes, getNapoleonicArrowheads } from "./napoleonicCampaigns";
 import QuizModule from "./QuizModule";
+import AuthMenu from "./AuthMenu";
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
@@ -1009,7 +1010,10 @@ function App() {
           <a href="#quizy">Quizy</a>
           <a href="#moduly">Postępy <span>WKRÓTCE</span></a>
         </nav>
-        <button className="ghost-button" type="button" onClick={scrollToMap}><Search size={17} /> Przejdź do mapy</button>
+        <div className="topbar-actions">
+          <button className="ghost-button" type="button" onClick={scrollToMap}><Search size={17} /> Przejdź do mapy</button>
+          <AuthMenu />
+        </div>
       </header>
 
       <main>

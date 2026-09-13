@@ -2,17 +2,27 @@ BEGIN;
 
 CREATE TABLE users (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    email varchar(255) NOT NULL UNIQUE,
+    email varchar(254) NOT NULL UNIQUE,
     password_hash text NOT NULL,
-    display_name varchar(100) NOT NULL
+    display_name varchar(100) NOT NULL,
+    role varchar(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE sessions (
+CREATE TABLE user_sessions (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash text NOT NULL UNIQUE,
-    expires_at timestamptz NOT NULL
+    token_hash char(64) NOT NULL UNIQUE,
+    expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    last_seen_at timestamptz NOT NULL DEFAULT now(),
+    user_agent varchar(500),
+    ip_address inet
 );
+
+CREATE INDEX user_sessions_user_idx ON user_sessions (user_id);
+CREATE INDEX user_sessions_expiry_idx ON user_sessions (expires_at);
 
 CREATE TABLE event_categories (
     id smallint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

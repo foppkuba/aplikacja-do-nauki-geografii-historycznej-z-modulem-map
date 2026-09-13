@@ -10,6 +10,7 @@
     "migrate:legacy": "node scripts/migrate-legacy-schema.mjs",
     "import:events": "node scripts/import-wikidata-events.mjs",
     "db:quizzes": "node scripts/setup-quizzes.mjs",
+    "db:auth": "node scripts/setup-auth.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
