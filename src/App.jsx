@@ -12,6 +12,7 @@ import { getActiveCampaignRoutes, getCampaignArrowheads } from "./ww2Campaigns";
 import { getClippedWw2TerritorialControl } from "./ww2TerritorialControl";
 import { getActiveNapoleonicRoutes, getNapoleonicArrowheads } from "./napoleonicCampaigns";
 import QuizModule from "./QuizModule";
+import LessonsModule from "./LessonsModule";
 import AuthMenu from "./AuthMenu";
 
 const MIN_YEAR = 1800;
@@ -1007,6 +1008,7 @@ function App() {
         <nav aria-label="Główna nawigacja">
           <a className="active" href="#mapa">Mapa</a>
           <a href="#odkrywaj">Odkrywaj</a>
+          <a href="#lekcje">Lekcje</a>
           <a href="#quizy">Quizy</a>
           <a href="#moduly">Postępy <span>WKRÓTCE</span></a>
         </nav>
@@ -1027,6 +1029,7 @@ function App() {
             <div className="hero-actions">
               <button className="primary-button" type="button" onClick={scrollToMap}>Otwórz mapę <ArrowRight size={18} /></button>
               <a href="#odkrywaj">Jak to działa?</a>
+              <a href="#lekcje">Przejdź do lekcji</a>
             </div>
             <div className="feature-row">
               <span><Check size={15} /> Interaktywna mapa</span>
@@ -1064,10 +1067,11 @@ function App() {
           <div className="steps">
             <article><span>01</span><div className="step-index">I</div><h3>Wybierz rok</h3><p>Użyj suwaka pod mapą albo wybierz jedną z przygotowanych dat.</p></article>
             <article><span>02</span><div className="step-index">II</div><h3>Eksploruj mapę</h3><p>Przesuwaj widok i przybliżaj interesujące Cię regiony świata.</p></article>
-            <article><span>03</span><div className="step-index">III</div><h3>Rozwijaj wiedzę</h3><p>W kolejnych etapach pojawią się wydarzenia, lekcje i quizy.</p></article>
+            <article><span>03</span><div className="step-index">III</div><h3>Rozwijaj wiedzę</h3><p>Poznaj historię XIX–XXI wieku w lekcjach i sprawdź wiedzę w quizie po każdym temacie.</p></article>
           </div>
         </section>
 
+        <LessonsModule />
         <QuizModule />
 
         <section className="future-modules" id="moduly">

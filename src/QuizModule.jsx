@@ -2,27 +2,28 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, RotateCcw, Trophy, X } from "lucide-react";
 import { checkQuizAnswer, fetchQuiz, fetchQuizCategories } from "./api/quizzes";
 
-export default function QuizModule() {
+export default function QuizModule({ lessonQuiz = null, onReturn, onNext }) {
   const [categories, setCategories] = useState([]);
-  const [quiz, setQuiz] = useState(null);
+  const [quiz, setQuiz] = useState(lessonQuiz);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answer, setAnswer] = useState(null);
   const [score, setScore] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!lessonQuiz);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (lessonQuiz) return;
     const controller = new AbortController();
     fetchQuizCategories({ signal: controller.signal }).then(setCategories)
       .catch((requestError) => requestError.name !== "AbortError" && setError(requestError.message))
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, []);
+  }, [lessonQuiz]);
 
   const startQuiz = async (slug) => {
     setLoading(true); setError("");
     try {
-      setQuiz(await fetchQuiz(slug));
+      setQuiz(lessonQuiz || await fetchQuiz(slug));
       setQuestionIndex(0); setAnswer(null); setScore(0);
     } catch (requestError) { setError(requestError.message); }
     finally { setLoading(false); }
@@ -31,21 +32,29 @@ export default function QuizModule() {
   const chooseAnswer = async (answerId) => {
     if (answer || !quiz) return;
     try {
-      const result = await checkQuizAnswer(quiz.questions[questionIndex].id, answerId);
+      const currentQuestion = quiz.questions[questionIndex];
+      const result = lessonQuiz ? {
+        isCorrect: answerId === currentQuestion.correctAnswerId,
+        correctAnswerId: currentQuestion.correctAnswerId,
+        explanation: currentQuestion.explanation,
+      } : await checkQuizAnswer(currentQuestion.id, answerId);
       setAnswer({ selectedId: answerId, ...result });
       if (result.isCorrect) setScore((current) => current + 1);
     } catch (requestError) { setError(requestError.message); }
   };
 
-  const leaveQuiz = () => { setQuiz(null); setQuestionIndex(0); setAnswer(null); setScore(0); };
+  const leaveQuiz = () => {
+    if (lessonQuiz) { onReturn(); return; }
+    setQuiz(null); setQuestionIndex(0); setAnswer(null); setScore(0);
+  };
   const question = quiz?.questions[questionIndex];
   const finished = quiz && questionIndex >= quiz.questions.length;
 
   return (
-    <section className="quiz-section" id="quizy" aria-labelledby="quiz-title">
+    <section className={lessonQuiz ? "lesson-quiz" : "quiz-section"} id={lessonQuiz ? "quiz-lekcji" : "quizy"} aria-labelledby={lessonQuiz ? "lesson-quiz-title" : "quiz-title"}>
       <div className="section-intro">
-        <div><span className="section-kicker">SPRAWDŹ SWOJĄ WIEDZĘ</span><h2 id="quiz-title">Quizy historyczne</h2></div>
-        <p>Pytania powstały na podstawie wydarzeń i kampanii prezentowanych na interaktywnej mapie.</p>
+        <div><span className="section-kicker">SPRAWDŹ SWOJĄ WIEDZĘ</span><h2 id={lessonQuiz ? "lesson-quiz-title" : "quiz-title"}>{lessonQuiz ? "Quiz po lekcji" : "Quizy historyczne"}</h2></div>
+        <p>{lessonQuiz ? `Temat: ${lessonQuiz.category.name}. Odpowiedz na pytania i sprawdź wyjaśnienia.` : "Pytania powstały na podstawie wydarzeń i kampanii prezentowanych na interaktywnej mapie."}</p>
       </div>
       {error && <p className="quiz-error" role="alert">{error}</p>}
       {loading && <div className="quiz-loading"><span className="loader" /> Wczytywanie quizu…</div>}
@@ -60,7 +69,7 @@ export default function QuizModule() {
       </div>}
       {!loading && quiz && !finished && question && <article className="quiz-player">
         <div className="quiz-player__top">
-          <button className="quiz-back" type="button" onClick={leaveQuiz}><ArrowLeft size={16} /> Kategorie</button>
+          <button className="quiz-back" type="button" onClick={leaveQuiz}><ArrowLeft size={16} /> {lessonQuiz ? "Wróć do lekcji" : "Kategorie"}</button>
           <span>{quiz.category.name}</span><strong>{questionIndex + 1} / {quiz.questions.length}</strong>
         </div>
         <div className="quiz-progress"><span style={{ width: `${((questionIndex + 1) / quiz.questions.length) * 100}%` }} /></div>
@@ -74,7 +83,7 @@ export default function QuizModule() {
             {isCorrect && <Check size={18} />}{isSelected && !isCorrect && <X size={18} />}
           </button>;
         })}</div>
-        {answer && <div className={`quiz-feedback ${answer.isCorrect ? "is-correct" : "is-wrong"}`}>
+        {answer && <div role="status" className={`quiz-feedback ${answer.isCorrect ? "is-correct" : "is-wrong"}`}>
           <strong>{answer.isCorrect ? "Dobra odpowiedź!" : "Jeszcze nie tym razem."}</strong><p>{answer.explanation}</p>
           <button type="button" onClick={() => { setQuestionIndex((index) => index + 1); setAnswer(null); }}>
             {questionIndex + 1 === quiz.questions.length ? "Zobacz wynik" : "Następne pytanie"} <ArrowRight size={16} />
@@ -84,7 +93,7 @@ export default function QuizModule() {
       {!loading && finished && <article className="quiz-result">
         <Trophy size={42} /><small>QUIZ UKOŃCZONY</small><h3>{score} / {quiz.questions.length}</h3>
         <p>Poprawne odpowiedzi: {Math.round((score / quiz.questions.length) * 100)}%</p>
-        <div><button type="button" onClick={() => startQuiz(quiz.category.slug)}><RotateCcw size={16} /> Spróbuj ponownie</button><button type="button" onClick={leaveQuiz}>Wybierz kategorię</button></div>
+        <div><button type="button" onClick={() => startQuiz(quiz.category.slug)}><RotateCcw size={16} /> Spróbuj ponownie</button><button type="button" onClick={leaveQuiz}>{lessonQuiz ? "Wróć do lekcji" : "Wybierz kategorię"}</button>{onNext && <button type="button" onClick={onNext}>Następna lekcja <ArrowRight size={16} /></button>}</div>
       </article>}
     </section>
   );

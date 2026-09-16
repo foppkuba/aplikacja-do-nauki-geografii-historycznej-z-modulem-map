@@ -34,6 +34,19 @@ Wymagania: zainstalowane środowisko [Node.js](https://nodejs.org/) wraz z npm.
 
 Serwer można zatrzymać skrótem `Ctrl+C` w terminalu.
 
+## Lekcje historii
+
+Sekcja „Lekcje” (`#lekcje`) zawiera siedem lekcji XIX–XXI wieku, filtr wieku,
+omówienia wydarzeń, najważniejsze daty i quiz po każdym temacie. Przycisk na końcu
+materiału otwiera przypisany quiz z trzema pytaniami, wyjaśnieniami i wynikiem.
+Po quizie można powtórzyć próbę, wrócić do materiału lub przejść do następnej lekcji.
+
+Treść i pytania znajdują się w `src/historyLessons.js`, a interfejs w
+`src/LessonsModule.jsx`. Quizy lekcji korzystają z komponentu `QuizModule` w trybie
+lokalnym: nie wymagają migracji bazy ani uruchomionego API. Dotychczasowe quizy
+kategorii nadal pobierają pytania z PostgreSQL. Wyniki lekcji nie są zapisywane
+na koncie i znikają po opuszczeniu quizu lub odświeżeniu strony.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

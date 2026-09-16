@@ -117,7 +117,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .hero h1 em { color: var(--green); font-style: normal; font-weight: 420; }
 .hero-copy > p { max-width: 590px; margin: 0; color: var(--ink-soft); font-size: 16px; line-height: 1.75; }
-.hero-actions { display: flex; align-items: center; gap: 26px; margin-top: 28px; }
+.hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 26px; margin-top: 28px; }
 .primary-button {
   padding: 15px 21px; color: white; background: var(--green);
   box-shadow: 0 12px 24px rgba(24, 79, 69, .2);
@@ -128,7 +128,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .feature-row span { display: flex; align-items: center; gap: 6px; color: #61736f; font-size: 11px; font-weight: 700; }
 .feature-row svg { color: var(--orange); }
 
-.map-section, .future-modules, .quiz-section {
+.map-section, .future-modules, .quiz-section, .lessons-section {
   padding: 76px max(28px, calc((100vw - 1140px) / 2)); background: var(--cream);
 }
 .section-intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 60px; margin-bottom: 30px; }
@@ -428,7 +428,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .quiz-result small { display: block; margin-top: 10px; }
 .quiz-result h3 { margin: 5px 0; color: var(--green); font: 700 46px Cambria, serif; }
 .quiz-result p { color: #697b77; }
-.quiz-result > div { display: flex; justify-content: center; gap: 10px; }
+.quiz-result > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .quiz-result button + button { color: var(--green); background: var(--green-light); }
 .module-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
 .module-card {
