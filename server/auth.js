@@ -83,10 +83,10 @@ function rateLimit(request, response, next) {
   return next();
 }
 
-async function createSession(userId, request, response) {
+async function createSession(userId, request, response, database = pool) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_MS);
-  await pool.query(`
+  await database.query(`
     INSERT INTO user_sessions (user_id, token_hash, expires_at, user_agent, ip_address)
     VALUES ($1, $2, $3, $4, $5)
   `, [userId, tokenHash(token), expiresAt, request.get("user-agent")?.slice(0, 500) || null, clientIp(request)]);
@@ -121,15 +121,29 @@ router.post("/register", verifyOrigin, rateLimit, async (request, response, next
     }
 
     const passwordHash = await hashPassword(password);
-    const result = await pool.query(`
-      INSERT INTO users (email, display_name, password_hash)
-      VALUES ($1, $2, $3)
-      ON CONFLICT DO NOTHING
-      RETURNING id, email, display_name, role
-    `, [email, displayName, passwordHash]);
-    if (!result.rowCount) return response.status(409).json({ error: "Konto z tym adresem e-mail już istnieje." });
-    await createSession(result.rows[0].id, request, response);
-    return response.status(201).json({ user: publicUser(result.rows[0]) });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(`
+        INSERT INTO users (email, display_name, password_hash)
+        VALUES ($1, $2, $3)
+        ON CONFLICT DO NOTHING
+        RETURNING id, email, display_name, role
+      `, [email, displayName, passwordHash]);
+      if (!result.rowCount) {
+        await client.query("ROLLBACK");
+        return response.status(409).json({ error: "Konto z tym adresem e-mail już istnieje." });
+      }
+      await createSession(result.rows[0].id, request, response, client);
+      await client.query("COMMIT");
+      return response.status(201).json({ user: publicUser(result.rows[0]) });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      response.removeHeader("Set-Cookie");
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     return next(error);
   }
@@ -172,4 +186,4 @@ router.post("/logout", verifyOrigin, async (request, response, next) => {
   }
 });
 
-export { router as authRouter };
+export { router as authRouter, currentUser, verifyOrigin };

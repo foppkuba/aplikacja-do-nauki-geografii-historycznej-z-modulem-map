@@ -1,5 +1,21 @@
 BEGIN;
 
+DO $$
+BEGIN
+    IF to_regclass('public.sessions') IS NOT NULL
+       AND to_regclass('public.user_sessions') IS NULL THEN
+        ALTER TABLE sessions RENAME TO user_sessions;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'user_sessions'
+                 AND column_name = 'refresh_token_hash')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_schema = 'public' AND table_name = 'user_sessions'
+                         AND column_name = 'token_hash') THEN
+        ALTER TABLE user_sessions RENAME COLUMN refresh_token_hash TO token_hash;
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS users (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email varchar(254) NOT NULL,

@@ -12,12 +12,6 @@ const client = new pg.Client({
 
 try {
   await client.connect();
-  const tables = await client.query(`
-    SELECT to_regclass('public.sessions') AS legacy, to_regclass('public.user_sessions') AS current
-  `);
-  if (tables.rows[0].legacy && !tables.rows[0].current) {
-    await client.query("ALTER TABLE sessions RENAME TO user_sessions");
-  }
   await client.query(sql);
   console.log("Tabele użytkowników i sesji zostały zapisane w bazie.");
 } finally {

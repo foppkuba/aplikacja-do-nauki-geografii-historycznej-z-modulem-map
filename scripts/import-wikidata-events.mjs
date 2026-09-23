@@ -98,6 +98,11 @@ const main = async () => {
     SELECT name, valid_from AS "validFrom", valid_to AS "validTo", longitude, latitude
     FROM country_periods
   `);
+  const { rows: columns } = await pool.query(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'historical_events'
+  `);
+  const hasLegacySchema = columns.some(({ column_name }) => column_name === "start_date");
 
   const allEvents = [];
   for (const window of WINDOWS) {
@@ -121,28 +126,42 @@ const main = async () => {
 
   const uniqueEvents = [...new Map([...selected.values()].map((event) => [event.externalId, event])).values()];
   let inserted = 0;
-  for (const event of uniqueEvents) {
-    const country = nearestCountry(event, countriesResult.rows);
-    const category = /bitw|wojn|oblężeni|inwazj|operacj|powstani|masakr/i.test(event.label) ? "Wojna" : "Polityka";
-    const description = event.description
-      ? `${event.label} — ${event.description}.`
-      : `${event.label} — wydarzenie historyczne odnotowane w Wikidata.`;
-    const result = await pool.query(`
-      INSERT INTO historical_events
-        (title, description, category_id, event_date, place, country, longitude, latitude, external_id)
-      SELECT $1, $2, category.id, $3::date, $4, $5, $6, $7, $8
-      FROM event_categories category WHERE category.name = $9
-      ON CONFLICT (external_id) WHERE external_id IS NOT NULL DO NOTHING
-      RETURNING id
-    `, [event.label, description, event.date, event.label, country, event.longitude, event.latitude, event.externalId, category]);
-    const eventId = result.rows[0]?.id;
-    if (eventId) {
-      inserted += 1;
-      await pool.query(
-        "INSERT INTO event_sources (event_id, title, url) VALUES ($1, $2, $3)",
-        [eventId, "Wikidata", `https://www.wikidata.org/wiki/${event.externalId}`],
-      );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const event of uniqueEvents) {
+      const country = nearestCountry(event, countriesResult.rows);
+      const category = /bitw|wojn|oblężeni|inwazj|operacj|powstani|masakr/i.test(event.label) ? "Wojna" : "Polityka";
+      const description = event.description
+        ? `${event.label} — ${event.description}.`
+        : `${event.label} — wydarzenie historyczne odnotowane w Wikidata.`;
+      const result = await client.query(`
+        INSERT INTO historical_events
+          (title, description, category_id, event_date, place, country, longitude, latitude, external_id
+           ${hasLegacySchema ? ", slug, event_type, start_date, display_date, place_name, country_name, location, status, published_at" : ""})
+        SELECT $1::text, $2::text, category.id, $3::date, $4::text, $5::text,
+               $6::double precision, $7::double precision, $8::text
+          ${hasLegacySchema ? `, 'wikidata-' || $8, CASE WHEN $1 ~* '^bitwa' THEN 'battle' ELSE 'political' END,
+            $3::date, $3::text, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326), 'published', now()` : ""}
+        FROM event_categories category WHERE category.name = $9
+        ON CONFLICT (external_id) WHERE external_id IS NOT NULL DO NOTHING
+        RETURNING id
+      `, [event.label, description, event.date, event.label, country, event.longitude, event.latitude, event.externalId, category]);
+      const eventId = result.rows[0]?.id;
+      if (eventId) {
+        inserted += 1;
+        await client.query(
+          "INSERT INTO event_sources (event_id, title, url) VALUES ($1, $2, $3)",
+          [eventId, "Wikidata", `https://www.wikidata.org/wiki/${event.externalId}`],
+        );
+      }
     }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
 
   const coverage = await pool.query(`

@@ -4,7 +4,7 @@ import { historyLessons } from "./historyLessons";
 import QuizModule from "./QuizModule";
 import "./LessonsModule.css";
 
-export default function LessonsModule() {
+export default function LessonsModule({ account, onProgressSaved }) {
   const [century, setCentury] = useState("Wszystkie");
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [view, setView] = useState("catalog");
@@ -55,7 +55,7 @@ export default function LessonsModule() {
         <div className="lesson-takeaway"><h4>Zapamiętaj</h4><p>{lesson.takeaway}</p></div>
         <footer className="lesson-finish"><div><h4>Czas sprawdzić wiedzę</h4><p>Quiz zawiera {lesson.quiz.questions.length} pytania dotyczące tej lekcji. Po każdej odpowiedzi zobaczysz wyjaśnienie.</p></div><button type="button" className="primary-button" onClick={() => navigate("quiz")}>Przejdź do quizu <ArrowRight size={18} /></button></footer>
       </article>}
-      {view === "quiz" && lesson && <QuizModule key={lesson.slug} lessonQuiz={lesson.quiz} onReturn={() => navigate("reading")} onNext={nextLesson ? () => navigate("reading", nextLesson.slug) : undefined} />}
+      {view === "quiz" && lesson && <QuizModule key={lesson.slug} account={account} onProgressSaved={onProgressSaved} lessonQuiz={lesson.quiz} onReturn={() => navigate("reading")} onNext={nextLesson ? () => navigate("reading", nextLesson.slug) : undefined} />}
     </>}
   </section>;
 }

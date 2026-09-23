@@ -14,6 +14,7 @@ import { getActiveNapoleonicRoutes, getNapoleonicArrowheads } from "./napoleonic
 import QuizModule from "./QuizModule";
 import LessonsModule from "./LessonsModule";
 import AuthMenu from "./AuthMenu";
+import ProgressModule from "./ProgressModule";
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
@@ -432,7 +433,6 @@ const addVisibleCountryBoundaries = (map, selectedMonth, ww1Alignments) => {
   map.addSource("country-polygons", {
     type: "geojson",
     data: getCountryPolygonUrl(selectedMonth),
-    attribution: "Historical polygons: historical-basemaps (GPL-3.0)",
   });
 
   map.addLayer({
@@ -475,10 +475,6 @@ const localizeCountryLabels = (map) => {
   });
 };
 
-const modules = [
-  ["PR", "Twoje postępy", "Obserwuj wyniki, ukończone epoki i czas poświęcony na naukę."],
-  ["SN", "Ścieżki nauki", "Poznawaj historię krok po kroku dzięki uporządkowanym materiałom."],
-];
 
 function EventFilters({ countries, categories, countryFilter, categoryFilter, setCountryFilter, setCategoryFilter }) {
   const hasActiveFilters = Boolean(countryFilter || categoryFilter);
@@ -882,6 +878,9 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
 }
 
 function App() {
+  const [account, setAccount] = useState(undefined);
+  const [progressRevision, setProgressRevision] = useState(0);
+  const refreshProgress = () => setProgressRevision((value) => value + 1);
   const [events, setEvents] = useState([]);
   const [countries, setCountries] = useState([]);
   const [eventsError, setEventsError] = useState("");
@@ -1007,14 +1006,13 @@ function App() {
         </a>
         <nav aria-label="Główna nawigacja">
           <a className="active" href="#mapa">Mapa</a>
-          <a href="#odkrywaj">Odkrywaj</a>
           <a href="#lekcje">Lekcje</a>
           <a href="#quizy">Quizy</a>
-          <a href="#moduly">Postępy <span>WKRÓTCE</span></a>
+          <a href="#postepy">Twoje postępy</a>
         </nav>
         <div className="topbar-actions">
           <button className="ghost-button" type="button" onClick={scrollToMap}><Search size={17} /> Przejdź do mapy</button>
-          <AuthMenu />
+          <AuthMenu onUserChange={setAccount} />
         </div>
       </header>
 
@@ -1028,7 +1026,6 @@ function App() {
             </p>
             <div className="hero-actions">
               <button className="primary-button" type="button" onClick={scrollToMap}>Otwórz mapę <ArrowRight size={18} /></button>
-              <a href="#odkrywaj">Jak to działa?</a>
               <a href="#lekcje">Przejdź do lekcji</a>
             </div>
             <div className="feature-row">
@@ -1058,38 +1055,9 @@ function App() {
           <Timeline year={year} setYear={selectYear} selectedMonth={selectedMonth} setSelectedMonth={selectWarMonth} />
         </section>
 
-        <section className="how-it-works" id="odkrywaj">
-          <div className="centered-heading">
-            <span className="section-kicker">PROSTY POCZĄTEK</span>
-            <h2>Jak działa prototyp?</h2>
-            <p>Ta wersja skupia się na najważniejszym fundamencie przyszłej aplikacji.</p>
-          </div>
-          <div className="steps">
-            <article><span>01</span><div className="step-index">I</div><h3>Wybierz rok</h3><p>Użyj suwaka pod mapą albo wybierz jedną z przygotowanych dat.</p></article>
-            <article><span>02</span><div className="step-index">II</div><h3>Eksploruj mapę</h3><p>Przesuwaj widok i przybliżaj interesujące Cię regiony świata.</p></article>
-            <article><span>03</span><div className="step-index">III</div><h3>Rozwijaj wiedzę</h3><p>Poznaj historię XIX–XXI wieku w lekcjach i sprawdź wiedzę w quizie po każdym temacie.</p></article>
-          </div>
-        </section>
-
-        <LessonsModule />
-        <QuizModule />
-
-        <section className="future-modules" id="moduly">
-          <div className="section-intro">
-            <div><span className="section-kicker">KOLEJNE ETAPY</span><h2>Miejsce na dalszy rozwój</h2></div>
-            <p>Moduły są już uwzględnione w strukturze interfejsu. Ich zawartość zostanie dodana w następnych iteracjach projektu.</p>
-          </div>
-          <div className="module-grid">
-            {modules.map(([code, title, description]) => (
-              <article key={title} className="module-card">
-                <div className="module-code">{code}</div>
-                <small>MODUŁ W PRZYGOTOWANIU</small>
-                <h3>{title}</h3><p>{description}</p>
-                <button type="button" disabled>Dostępne wkrótce <ChevronDown size={16} /></button>
-              </article>
-            ))}
-          </div>
-        </section>
+        <LessonsModule key={`lessons-${account?.id || 'guest'}`} account={account} onProgressSaved={refreshProgress} />
+        <QuizModule key={`quiz-${account?.id || 'guest'}`} account={account} onProgressSaved={refreshProgress} />
+        <ProgressModule key={`progress-${account?.id || 'guest'}`} account={account} revision={progressRevision} />
       </main>
 
       <footer>

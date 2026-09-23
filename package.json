@@ -9,8 +9,12 @@
     "start:api": "node server/index.js",
     "migrate:legacy": "node scripts/migrate-legacy-schema.mjs",
     "import:events": "node scripts/import-wikidata-events.mjs",
+    "export:events": "node scripts/export-events.mjs",
+    "restore:events": "node scripts/restore-events.mjs",
     "db:quizzes": "node scripts/setup-quizzes.mjs",
     "db:auth": "node scripts/setup-auth.mjs",
+    "db:progress": "node scripts/setup-progress.mjs",
+    "test:progress": "node --test scripts/test-progress.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

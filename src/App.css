@@ -128,12 +128,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .feature-row span { display: flex; align-items: center; gap: 6px; color: #61736f; font-size: 11px; font-weight: 700; }
 .feature-row svg { color: var(--orange); }
 
-.map-section, .future-modules, .quiz-section, .lessons-section {
+.map-section, .quiz-section, .lessons-section {
   padding: 76px max(28px, calc((100vw - 1140px) / 2)); background: var(--cream);
 }
 .section-intro { display: flex; align-items: flex-end; justify-content: space-between; gap: 60px; margin-bottom: 30px; }
 .section-kicker { color: var(--orange); font-size: 9px; font-weight: 900; letter-spacing: 1.7px; }
-.section-intro h2, .centered-heading h2, .timeline-heading h2 {
+.section-intro h2, .timeline-heading h2 {
   margin: 8px 0 0; font-family: Cambria, "Times New Roman", serif; font-size: 33px; font-weight: 600; letter-spacing: -.7px;
 }
 .section-intro > p { max-width: 450px; margin: 0; color: #647872; font-size: 12px; line-height: 1.7; }
@@ -367,26 +367,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .timeline-note svg { color: var(--orange); }
 
-.how-it-works { padding: 84px max(28px, calc((100vw - 1080px) / 2)) 96px; }
-.centered-heading { max-width: 570px; margin: 0 auto 44px; text-align: center; }
-.centered-heading p { color: #697b77; font-size: 12px; }
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px; }
-.steps article {
-  position: relative; padding: 34px 30px; text-align: center; background: #faf9f4;
-  border: 1px solid #edf0e9; border-radius: 16px;
-}
-.steps article > span {
-  position: absolute; right: 17px; top: 13px; color: #d5ddd8; font: 700 30px Cambria, "Times New Roman", serif;
-}
-.step-index, .module-code {
-  display: grid; place-items: center; color: var(--orange); background: #fae9dd;
-  border: 1px solid #f2d8c7; border-radius: 9px; font: 700 12px Cambria, "Times New Roman", serif;
-  letter-spacing: .7px;
-}
-.step-index { width: 50px; height: 50px; margin: 0 auto 18px; }
-.steps h3, .module-card h3 { margin: 0 0 9px; font-family: "Segoe UI Variable Display", "Segoe UI", Arial, sans-serif; font-size: 19px; font-weight: 700; }
-.steps p, .module-card p { margin: 0; color: #6c7d79; font-size: 11px; line-height: 1.65; }
-.future-modules { background: #edf3ee; }
 .quiz-section { background: #edf3ee; }
 .quiz-categories { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
 .quiz-category {
@@ -430,21 +410,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .quiz-result p { color: #697b77; }
 .quiz-result > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .quiz-result button + button { color: var(--green); background: var(--green-light); }
-.module-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
-.module-card {
-  min-height: 250px; padding: 27px; background: rgba(255,253,248,.78);
-  border: 1px solid #dfe8e1; border-radius: 16px;
-}
-.module-code { width: 48px; height: 48px; margin-bottom: 23px; }
-.module-card small {
-  display: block; margin-bottom: 9px; color: #93a19d; font-size: 7px;
-  font-weight: 900; letter-spacing: 1.2px;
-}
-.module-card p { min-height: 54px; }
-.module-card button {
-  display: flex; align-items: center; gap: 7px; margin-top: 19px; padding: 0;
-  color: #8b9995; background: transparent; border: 0; font-size: 10px; font-weight: 800;
-}
 footer {
   display: grid; grid-template-columns: 1fr 1.5fr 1fr; align-items: center; gap: 40px;
   max-width: 1240px; margin: 0 auto; padding: 35px 28px; color: #70817d;
@@ -461,7 +426,7 @@ footer > a { color: var(--green); font-size: 10px; font-weight: 800; text-align:
   .event-filters__title { flex: 1 0 100%; margin-right: 0; }
   .event-filter-field { flex: 1; }
   .map-shell { height: 500px; }
-  .steps, .module-grid, .quiz-categories { grid-template-columns: 1fr; }
+  .quiz-categories { grid-template-columns: 1fr; }
   footer { grid-template-columns: 1fr; justify-items: center; }
   footer > a { text-align: center; }
 }
@@ -475,7 +440,7 @@ footer > a { color: var(--green); font-size: 10px; font-weight: 800; text-align:
   .hero { min-height: auto; padding: 48px 22px 58px; }
   .hero h1 { font-size: 45px; letter-spacing: -2px; }
   .feature-row { gap: 10px 16px; }
-  .map-section, .future-modules, .quiz-section, .how-it-works { padding-left: 18px; padding-right: 18px; }
+  .map-section, .quiz-section { padding-left: 18px; padding-right: 18px; }
   .quiz-player { padding: 23px 18px; }
   .quiz-player__top { grid-template-columns: 1fr auto; }
   .quiz-player__top > span { display: none; }

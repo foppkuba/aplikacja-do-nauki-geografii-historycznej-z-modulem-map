@@ -1,0 +1,27 @@
+.progress-section { padding: 64px max(28px, calc((100% - 1184px) / 2)); background: #edf3ee; scroll-margin-top: 30px; }
+.progress-stats { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0 32px; border-block: 1px solid #d2dfd8; }
+.progress-stats > div { padding: 25px 18px; color: #1c5147; }
+.progress-stats dt { margin: 12px 0 6px; font-size: 13px; color: #5d746d; }
+.progress-stats dd { margin: 0; font-size: 30px; font-weight: 700; }
+.progress-stats dd small { font-size: 17px; color: #657c74; }
+.progress-details { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+.progress-details h3, .progress-empty h3 { font-size: 24px; margin: 0 0 12px; }
+.progress-details p, .progress-empty p, .progress-note { color: #5d746d; font-size: 14px; line-height: 1.7; }
+.progress-lessons progress { width: 100%; height: 10px; accent-color: #195348; margin: 12px 0; }
+.progress-details ul, .progress-details ol { list-style: none; margin: 0 0 22px; padding: 0; }
+.progress-details li { display: flex; justify-content: space-between; gap: 18px; padding: 16px 0; border-bottom: 1px solid #d2dfd8; font-size: 14px; }
+.progress-lessons li > span { display: flex; align-items: center; gap: 8px; }
+.progress-lessons li > strong { text-align: right; font-size: 12px; font-weight: 500; flex-shrink: 0; color: #5d746d; }
+.progress-done { color: #195348; font-weight: 600; }
+.progress-link { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: #195348; }
+.progress-history li div { display: grid; gap: 5px; }
+.progress-history li small { font-size: 10px; color: #647a72; letter-spacing: .06em; }
+.progress-history li time { font-size: 12px; color: #647a72; }
+.progress-history li > span { flex-shrink: 0; font-size: 20px; font-weight: 700; text-align: right; }
+.progress-history li > span small { display: block; margin-top: 5px; }
+.progress-empty { max-width: 560px; padding: 20px 0; }
+.progress-empty > svg { color: #195348; margin-bottom: 16px; }
+.progress-start { line-height: 1.8; margin-bottom: 30px; }
+.progress-note { margin: 32px 0 0; font-size: 12px; }
+.quiz-save-status { margin: 15px 0; font-size: 14px; }
+@media (max-width: 760px) { .progress-section { padding: 42px 18px; } .progress-details { grid-template-columns: 1fr; gap: 32px; } .progress-stats { grid-template-columns: 1fr 1fr; } .progress-stats > div { padding: 18px 8px; } }

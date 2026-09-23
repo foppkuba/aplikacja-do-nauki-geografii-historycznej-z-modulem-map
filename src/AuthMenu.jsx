@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, LogIn, LogOut, UserRound, X } from "lucide-react";
 import { fetchCurrentUser, loginUser, logoutUser, registerUser } from "./api/auth";
 
-export default function AuthMenu() {
+export default function AuthMenu({ onUserChange }) {
   const [user, setUser] = useState(null);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("login");
@@ -14,11 +14,13 @@ export default function AuthMenu() {
   useEffect(() => {
     const controller = new AbortController();
     fetchCurrentUser({ signal: controller.signal })
-      .then(setUser)
-      .catch((requestError) => requestError.name !== "AbortError" && console.error(requestError))
+      .then((account) => { setUser(account); onUserChange(account); })
+      .catch((requestError) => {
+        if (requestError.name !== "AbortError") { console.error(requestError); onUserChange(null); }
+      })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, []);
+  }, [onUserChange]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -34,17 +36,19 @@ export default function AuthMenu() {
 
   const submit = async (event) => {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setSubmitting(true);
     setError("");
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     try {
       const credentials = { email: form.get("email"), password: form.get("password") };
       const authenticatedUser = mode === "register"
         ? await registerUser({ ...credentials, displayName: form.get("displayName") })
         : await loginUser(credentials);
+      formElement.reset();
       setUser(authenticatedUser);
+      onUserChange(authenticatedUser);
       setOpen(false);
-      event.currentTarget.reset();
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -58,6 +62,7 @@ export default function AuthMenu() {
     try {
       await logoutUser();
       setUser(null);
+      onUserChange(null);
       setOpen(false);
     } catch (requestError) {
       setError(requestError.message);

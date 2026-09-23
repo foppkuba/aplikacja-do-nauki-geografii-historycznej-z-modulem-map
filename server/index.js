@@ -1,6 +1,7 @@
 import express from "express";
 import { pool } from "./db.js";
 import { authRouter } from "./auth.js";
+import { progressRouter } from "./progress.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -8,6 +9,7 @@ const port = Number(process.env.PORT || 3000);
 app.use(express.json());
 app.disable("x-powered-by");
 app.use("/api/auth", authRouter);
+app.use("/api/progress", progressRouter);
 
 app.get("/api/quizzes/categories", async (_request, response, next) => {
   try {
