@@ -13,6 +13,8 @@ import { getClippedWw2TerritorialControl } from "./ww2TerritorialControl";
 import { getActiveNapoleonicRoutes, getNapoleonicArrowheads } from "./napoleonicCampaigns";
 import QuizModule from "./QuizModule";
 import LessonsModule from "./LessonsModule";
+import { historyLessons } from "./historyLessons";
+import { lessonMapLinks } from "./lessonMapLinks";
 import AuthMenu from "./AuthMenu";
 import ProgressModule from "./ProgressModule";
 
@@ -779,6 +781,27 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
     setSelectedMonth(monthKey);
   };
 
+  const stepTime = (direction) => {
+    if (isWar && (direction < 0 ? selectedMonthIndex > warStartMonth : selectedMonthIndex < warEndMonth)) {
+      const monthStep = isNapoleonic ? 4 : 1;
+      stopAndSetMonth(monthKeyFromIndex(Math.max(warStartMonth, Math.min(warEndMonth, selectedMonthIndex + direction * monthStep))));
+      return;
+    }
+
+    const nextYear = Math.max(MIN_YEAR, Math.min(MAX_YEAR, year + direction));
+    const warBounds = [
+      [NAPOLEON_START_MONTH, NAPOLEON_END_MONTH],
+      [WW1_START_MONTH, WW1_END_MONTH],
+      [WW2_START_MONTH, WW2_END_MONTH],
+    ].find(([start, end]) => nextYear >= Math.floor(start / 12) && nextYear <= Math.floor(end / 12));
+
+    if (warBounds) {
+      stopAndSetMonth(monthKeyFromIndex(warBounds[direction > 0 ? 0 : 1]));
+    } else {
+      stopAndSetYear(nextYear);
+    }
+  };
+
   const togglePlayback = () => {
     if (!isPlaying && year >= MAX_YEAR) setYear(MIN_YEAR);
     setIsPlaying((playing) => !playing);
@@ -813,6 +836,15 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
           />
           </label>
         </div>
+      </div>
+      <div className="timeline-navigation" role="group" aria-label="Zmień datę mapy">
+        <button type="button" onClick={() => stepTime(-1)} disabled={year <= MIN_YEAR}>
+          <span aria-hidden="true">←</span> Poprzedni
+        </button>
+        <span>{isNapoleonic ? "Krok: 4 miesiące" : isWar ? "Krok: 1 miesiąc" : "Krok: 1 rok"}</span>
+        <button type="button" onClick={() => stepTime(1)} disabled={year >= MAX_YEAR}>
+          Następny <span aria-hidden="true">→</span>
+        </button>
       </div>
       <div className="range-wrap" style={{ "--progress": `${progress}%` }}>
         <div className="range-track" />
@@ -878,6 +910,9 @@ function Timeline({ year, setYear, selectedMonth, setSelectedMonth }) {
 }
 
 function App() {
+  const lessonsRef = useRef(null);
+  const mapHeadingRef = useRef(null);
+  const [lessonMapVisit, setLessonMapVisit] = useState(null);
   const [account, setAccount] = useState(undefined);
   const [progressRevision, setProgressRevision] = useState(0);
   const refreshProgress = () => setProgressRevision((value) => value + 1);
@@ -997,6 +1032,21 @@ function App() {
     setYear(Number(monthKey.slice(0, 4)));
   };
 
+  const showLessonMap = (slug, stop) => {
+    if (stop.date.includes("-")) selectWarMonth(stop.date);
+    else selectYear(Number(stop.date));
+    setCountryFilter("");
+    setCategoryFilter("");
+    setLessonMapVisit((previous) => ({ slug, stop, revision: (previous?.revision || 0) + 1 }));
+    mapHeadingRef.current?.focus({ preventScroll: true });
+    scrollToMap();
+  };
+  const relatedLessons = historyLessons.filter(({ slug }) => {
+    const [start, end] = lessonMapLinks[slug].years;
+    return year >= start && year <= end;
+  });
+  const sourceLesson = historyLessons.find(({ slug }) => slug === lessonMapVisit?.slug);
+
   return (
     <div className="app">
       <header className="topbar">
@@ -1038,9 +1088,21 @@ function App() {
 
         <section className="map-section" id="mapa">
           <div className="section-intro">
-            <div><span className="section-kicker">INTERAKTYWNA MAPA HISTORYCZNA</span><h2>Zobacz, jak zmieniała się Europa</h2></div>
+            <div><span className="section-kicker">INTERAKTYWNA MAPA HISTORYCZNA</span><h2 ref={mapHeadingRef} tabIndex={-1}>Zobacz, jak zmieniała się Europa</h2></div>
             <p>Mapa korzysta bezpośrednio z otwartych danych OpenHistoricalMap. Możesz ją przesuwać, przybliżać i filtrować według roku, państwa oraz kategorii.</p>
           </div>
+          <aside className="map-lesson-links" aria-label="Lekcje związane z mapą">
+            {sourceLesson && <div className="map-lesson-return">
+              <div><strong>Odkrywasz mapę z lekcji: {sourceLesson.title}</strong><p>Punkt wyjścia: {lessonMapVisit.stop.label} ({lessonMapVisit.stop.date}).</p></div>
+              <button type="button" onClick={() => lessonsRef.current?.openLesson(sourceLesson.slug)}>Wróć do lekcji <ArrowRight size={16} aria-hidden="true" /></button>
+            </div>}
+            <h3>Poznaj tło wydarzeń · {year}</h3>
+            <div className="map-lesson-options">
+              {relatedLessons.length ? relatedLessons.map((lesson) => <button type="button" key={lesson.slug} onClick={() => lessonsRef.current?.openLesson(lesson.slug)}>
+                {lesson.title} <ArrowRight size={16} aria-hidden="true" />
+              </button>) : <a href="#lekcje">Przeglądaj wszystkie lekcje</a>}
+            </div>
+          </aside>
           <EventFilters
             countries={countries.map((country) => country.name)}
             categories={eventCategories}
@@ -1052,10 +1114,10 @@ function App() {
           {eventsError && <p className="events-error" role="alert">{eventsError}</p>}
           {countriesError && <p className="events-error" role="status">{countriesError}</p>}
           <HistoryMap events={europeanEvents} countries={countries} ww1Alignments={ww1Alignments} ww1TerritorialKeyframes={ww1TerritorialKeyframes} year={year} selectedMonth={selectedMonth} countryFilter={countryFilter} categoryFilter={categoryFilter} />
-          <Timeline year={year} setYear={selectYear} selectedMonth={selectedMonth} setSelectedMonth={selectWarMonth} />
+          <Timeline key={lessonMapVisit?.revision || 0} year={year} setYear={selectYear} selectedMonth={selectedMonth} setSelectedMonth={selectWarMonth} />
         </section>
 
-        <LessonsModule key={`lessons-${account?.id || 'guest'}`} account={account} onProgressSaved={refreshProgress} />
+        <LessonsModule ref={lessonsRef} key={`lessons-${account?.id || 'guest'}`} account={account} onProgressSaved={refreshProgress} onShowMap={showLessonMap} />
         <QuizModule key={`quiz-${account?.id || 'guest'}`} account={account} onProgressSaved={refreshProgress} />
         <ProgressModule key={`progress-${account?.id || 'guest'}`} account={account} revision={progressRevision} />
       </main>

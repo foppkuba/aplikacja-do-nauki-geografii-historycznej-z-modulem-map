@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Clock3 } from "lucide-react";
 import { historyLessons } from "./historyLessons";
+import { lessonMapLinks } from "./lessonMapLinks";
 import QuizModule from "./QuizModule";
 import "./LessonsModule.css";
 
-export default function LessonsModule({ account, onProgressSaved }) {
+export default function LessonsModule({ account, onProgressSaved, onShowMap, ref }) {
   const [century, setCentury] = useState("Wszystkie");
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [view, setView] = useState("catalog");
@@ -25,6 +26,15 @@ export default function LessonsModule({ account, onProgressSaved }) {
     setSelectedSlug(slug);
     setView(nextView);
   };
+
+  useImperativeHandle(ref, () => ({
+    openLesson(slug) {
+      if (!historyLessons.some((item) => item.slug === slug)) return;
+      navigate("reading", slug);
+      heading.current?.focus({ preventScroll: true });
+      heading.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    },
+  }));
 
   return <section className="lessons-section" id="lekcje" aria-labelledby="lessons-title">
     <div className="section-intro">
@@ -52,6 +62,13 @@ export default function LessonsModule({ account, onProgressSaved }) {
         <header><span className="section-kicker">{lesson.century} WIEK · {lesson.period}</span><h3>{lesson.title}</h3><p>{lesson.summary}</p></header>
         {lesson.sections.map(([title, content]) => <section key={title}><h4>{title}</h4><p>{content}</p></section>)}
         <aside className="lesson-dates" aria-label="Najważniejsze daty"><h4>Najważniejsze daty</h4><dl>{lesson.dates.map(([date, event]) => <div key={date}><dt>{date}</dt><dd>{event}</dd></div>)}</dl></aside>
+        <aside className="lesson-map-links" aria-label="Odkrywaj temat na mapie">
+          <h4>Z lekcji na mapę</h4>
+          <p>Porównaj mapę Europy w wybranych momentach tej lekcji. Przy mapie znajdziesz przycisk powrotu do tego tematu.</p>
+          <div>{lessonMapLinks[lesson.slug].stops.map((stop) => <button type="button" key={stop.date} onClick={() => onShowMap(lesson.slug, stop)}>
+            <strong>{stop.label}</strong><span>{stop.date} · Zobacz mapę <ArrowRight size={15} aria-hidden="true" /></span>
+          </button>)}</div>
+        </aside>
         <div className="lesson-takeaway"><h4>Zapamiętaj</h4><p>{lesson.takeaway}</p></div>
         <footer className="lesson-finish"><div><h4>Czas sprawdzić wiedzę</h4><p>Quiz zawiera {lesson.quiz.questions.length} pytania dotyczące tej lekcji. Po każdej odpowiedzi zobaczysz wyjaśnienie.</p></div><button type="button" className="primary-button" onClick={() => navigate("quiz")}>Przejdź do quizu <ArrowRight size={18} /></button></footer>
       </article>}

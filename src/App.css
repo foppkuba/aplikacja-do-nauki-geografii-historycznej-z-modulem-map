@@ -313,6 +313,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .timeline-playback:hover { transform: translateY(-1px); }
 .timeline-playback.is-playing { background: var(--green); }
+.timeline-navigation { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+.timeline-navigation > span { color: #788a86; font-size: 12px; }
+.timeline-navigation button {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px;
+  color: var(--green); background: #f4f7f4; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.timeline-navigation button:hover:not(:disabled) { background: #e5eee8; }
+.timeline-navigation button:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+.timeline-navigation button:disabled { opacity: .4; cursor: default; }
 .year-field { display: flex; flex-direction: column; gap: 3px; }
 .year-field span { color: #788a86; font-size: 7px; font-weight: 900; letter-spacing: 1px; }
 .year-field input {
