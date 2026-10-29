@@ -1,10 +1,14 @@
 import express from "express";
+import { fileURLToPath } from "node:url";
 import { pool } from "./db.js";
 import { authRouter } from "./auth.js";
 import { progressRouter } from "./progress.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+
+// Enable only when the API is reachable exclusively through our reverse proxy.
+if (process.env.TRUST_PROXY === "1") app.set("trust proxy", 1);
 
 app.use(express.json());
 app.disable("x-powered-by");
@@ -194,6 +198,14 @@ app.get("/api/health", async (_request, response, next) => {
     next(error);
   }
 });
+
+app.use("/api", (_request, response) => {
+  response.status(404).json({ error: "Nie znaleziono endpointu API." });
+});
+
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(fileURLToPath(new URL("../dist/", import.meta.url))));
+}
 
 app.use((error, _request, response, _next) => {
   void _next;

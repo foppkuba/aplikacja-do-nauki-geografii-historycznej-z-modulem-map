@@ -1,0 +1,12 @@
+.git
+.agents
+.codex
+.aws
+node_modules
+dist
+.env
+.env.*
+.postgres-data
+backups
+*.dump
+*.log

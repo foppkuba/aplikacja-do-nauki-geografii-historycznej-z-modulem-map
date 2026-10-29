@@ -13,6 +13,8 @@ dist-ssr
 *.local
 .env
 .postgres-data/
+backups/
+*.dump
 .env.*
 !.env.example
 
