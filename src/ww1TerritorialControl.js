@@ -21,8 +21,8 @@ const interpolateFrame = (month, keyframes) => {
   const frames = keyframes.map((frame) => ({ ...frame, index: toMonthIndex(frame.month) }));
   const selected = toMonthIndex(month);
   const nextIndex = frames.findIndex(({ index }) => index >= selected);
-  if (nextIndex <= 0) return frames[Math.max(0, nextIndex)];
   if (nextIndex === -1) return frames.at(-1);
+  if (nextIndex === 0) return frames[0];
   const previous = frames[nextIndex - 1];
   const next = frames[nextIndex];
   const progress = (selected - previous.index) / (next.index - previous.index);

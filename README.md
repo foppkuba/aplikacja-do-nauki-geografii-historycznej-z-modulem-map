@@ -1,4 +1,40 @@
-# React + Vite
+# Chronomap
+
+## Testy wewnętrzne
+
+Wymagane: Node.js 22.12+, zależności z `npm ci` oraz działający PostgreSQL
+z połączeniem w `DATABASE_URL` w `.env` lub w `TEST_DATABASE_URL`.
+
+```powershell
+npm test                 # testy jednostkowe, bez bazy
+npm run test:integration # testy API z PostgreSQL
+npm run test:internal    # oba zestawy, ESLint i kompilacja
+```
+
+Wyniki `PASS` / `FAIL`, opisy błędów i podsumowanie są wyświetlane w terminalu.
+Skrypt nie generuje plików z raportami. Kod wyjścia `0` oznacza powodzenie,
+a `1` — błąd testu, narzędzia lub środowiska.
+
+Nie trzeba wcześniej uruchamiać frontendu ani API. Testy integracyjne uruchamiają
+własne API i korzystają z osobnego schematu bazy, usuwanego po zakończeniu.
+Baza musi już istnieć, a konto musi mieć uprawnienie CREATE SCHEMA.
+Przerwanie procesu może pozostawić schemat testowy.
+
+Jeśli Node.js i npm nie są dostępne systemowo, ale masz lokalny Node.js w `.tools`
+i zainstalowane zależności w `node_modules`, pełny zestaw uruchomisz tak:
+
+```powershell
+.\.tools\node.exe scripts\test-internal.mjs
+```
+
+Jeśli korzystasz z lokalnego PostgreSQL w `.tools/pgsql` i istniejącej bazy
+w `.postgres-data`, możesz uruchomić serwer w osobnym terminalu:
+
+```powershell
+.\.tools\pgsql\bin\postgres.exe -D .\.postgres-data -h 127.0.0.1 -p 5432
+```
+
+
 
 ## Uruchamianie aplikacji
 
@@ -92,9 +128,9 @@ Goście mogą ćwiczyć bez zapisu. Zaloguj się przed rozpoczęciem quizu. Star
 wyników nie da się odtworzyć. Błąd zapisu pozostawia wynik na ekranie z przyciskiem
 ponowienia. Odtworzenie eksportu wydarzeń nie odtwarza postępów kont.
 
-Test integracyjny: `npm run test:progress` (wymaga przygotowanych tabel kont,
-quizów i postępów). Sprawdza weryfikację odpowiedzi, zapis obu rodzajów quizów,
-ponawianie żądań i izolację kont; po zakończeniu usuwa swoje konta testowe.
+Testy integracyjne postępów są częścią `npm run test:integration` i korzystają
+z osobnego schematu opisanego wyżej. Sprawdzają weryfikację odpowiedzi, zapis
+obu rodzajów quizów, ponawianie żądań i izolację kont.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

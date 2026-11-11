@@ -24,8 +24,8 @@ const FRONT_LATITUDES = [60, 56, 52, 48, 44];
 const interpolateFront = (selectedMonth) => {
   const selectedIndex = toMonthIndex(selectedMonth);
   const nextIndex = EASTERN_FRONT_KEYFRAMES.findIndex((frame) => frame.index >= selectedIndex);
-  if (nextIndex <= 0) return EASTERN_FRONT_KEYFRAMES[Math.max(0, nextIndex)].longitudes;
   if (nextIndex === -1) return EASTERN_FRONT_KEYFRAMES.at(-1).longitudes;
+  if (nextIndex === 0) return EASTERN_FRONT_KEYFRAMES[0].longitudes;
 
   const previous = EASTERN_FRONT_KEYFRAMES[nextIndex - 1];
   const next = EASTERN_FRONT_KEYFRAMES[nextIndex];

@@ -14,7 +14,9 @@
     "db:quizzes": "node scripts/setup-quizzes.mjs",
     "db:auth": "node scripts/setup-auth.mjs",
     "db:progress": "node scripts/setup-progress.mjs",
-    "test:progress": "node --test scripts/test-progress.mjs",
+    "test": "node scripts/test-internal.mjs --unit",
+    "test:internal": "node scripts/test-internal.mjs",
+    "test:integration": "node scripts/test-internal.mjs --integration",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

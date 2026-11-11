@@ -19,9 +19,11 @@ function publicUser(user) {
 }
 
 function parseCookies(header = "") {
-  return Object.fromEntries(header.split(";").map((part) => part.trim()).filter(Boolean).map((part) => {
+  return Object.fromEntries(header.split(";").map((part) => part.trim()).filter(Boolean).flatMap((part) => {
     const separator = part.indexOf("=");
-    return separator < 0 ? [part, ""] : [part.slice(0, separator), decodeURIComponent(part.slice(separator + 1))];
+    if (separator < 0) return [];
+    try { return [[part.slice(0, separator), decodeURIComponent(part.slice(separator + 1))]]; }
+    catch { return []; }
   }));
 }
 

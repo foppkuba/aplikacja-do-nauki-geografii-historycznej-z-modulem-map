@@ -17,6 +17,7 @@ import { historyLessons } from "./historyLessons";
 import { lessonMapLinks } from "./lessonMapLinks";
 import AuthMenu from "./AuthMenu";
 import ProgressModule from "./ProgressModule";
+import { EUROPE_BOUNDS, POLISH_MONTHS, monthKeyFromIndex, monthIndexFromKey, formatMonthKey, isEventInEurope, filterMapEvents } from './mapFilters';
 
 const MIN_YEAR = 1800;
 const MAX_YEAR = 2025;
@@ -27,24 +28,7 @@ const WW1_START_MONTH = 1914 * 12 + 6;
 const WW1_END_MONTH = 1918 * 12 + 10;
 const WW2_START_MONTH = 1939 * 12 + 8;
 const WW2_END_MONTH = 1945 * 12 + 4;
-const POLISH_MONTHS = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
-const monthKeyFromIndex = (index) => `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, "0")}`;
-const monthIndexFromKey = (key) => {
-  const [year, month] = key.split("-").map(Number);
-  return year * 12 + month - 1;
-};
-const formatMonthKey = (key) => {
-  const [year, month] = key.split("-").map(Number);
-  return `${POLISH_MONTHS[month - 1]} ${year}`;
-};
 const OHM_STYLE = "https://www.openhistoricalmap.org/map-styles/main/main.json";
-const EUROPE_BOUNDS = [[-25, 34], [45, 72]];
-const isEventInEurope = ({ coordinates: [longitude, latitude] }) => (
-  longitude >= EUROPE_BOUNDS[0][0]
-  && longitude <= EUROPE_BOUNDS[1][0]
-  && latitude >= EUROPE_BOUNDS[0][1]
-  && latitude <= EUROPE_BOUNDS[1][1]
-);
 
 const focusMapOnCountry = (map, events, country, countryDetails) => {
   if (!country) {
@@ -92,11 +76,7 @@ const updateEventMarkers = (map, events, year, selectedMonth, markerStore, filte
   markerStore.forEach((marker) => marker.remove());
   markerStore.length = 0;
 
-  const visibleEvents = events.filter((event) => (
-    (selectedMonth ? event.date.startsWith(selectedMonth) : event.year === Number(year))
-    && (!filters.country || event.country === filters.country)
-    && (!filters.category || event.category === filters.category)
-  ));
+  const visibleEvents = filterMapEvents(events, year, selectedMonth, filters);
   visibleEvents.forEach((event) => {
     const markerElement = document.createElement("button");
     markerElement.type = "button";
